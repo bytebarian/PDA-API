@@ -1,8 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 router = APIRouter()
 
 
 @router.get("/", tags=["root"])
-async def root() -> dict[str, str]:
-    return {"name": "PDA API", "status": "ok"}
+async def root(request: Request) -> dict[str, str]:
+    return {"name": request.app.title, "status": "ok"}
