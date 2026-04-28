@@ -16,4 +16,4 @@ def test_openapi_available() -> None:
     response = client.get("/openapi.json")
     assert response.status_code == 200
     payload = response.json()
-    assert payload["info"]["title"] == "PDA API"
+    assert payload["info"]["title"] == app.title
