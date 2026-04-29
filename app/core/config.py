@@ -63,8 +63,21 @@ def get_settings() -> Settings:
     return Settings()
 
 
+def _format_validation_error(exc: ValidationError) -> str:
+    details: list[str] = []
+    for error in exc.errors():
+        location = ".".join(str(part) for part in error.get("loc", ()))
+        message = error.get("msg", "invalid value")
+        if location:
+            details.append(f"{location}: {message}")
+        else:
+            details.append(str(message))
+    return "; ".join(details) if details else str(exc)
+
+
 def validate_settings() -> Settings:
     try:
         return get_settings()
     except ValidationError as exc:
-        raise RuntimeError(f"Invalid PDA configuration: {exc}") from exc
+        message = _format_validation_error(exc)
+        raise RuntimeError(f"Invalid PDA configuration: {message}") from exc
