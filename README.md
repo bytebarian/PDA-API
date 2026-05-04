@@ -76,6 +76,18 @@ PDA is designed as a privacy-first solution.
 - detect conflicts between agreements
 - generate reports based on contracts and official documents
 
+
+## Developer commands
+
+For CI-ready local verification, use the backend Make targets:
+
+- `make setup`
+- `make lint`
+- `make typecheck`
+- `make test`
+- `make migrate`
+- `make smoke`
+
 ## Project status
 
 This project is currently in the analysis and design phase.  
