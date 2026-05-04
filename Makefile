@@ -1,10 +1,12 @@
 PYTHON ?= python3
 
-.PHONY: setup lint typecheck test migrate smoke
+.PHONY: setup upgrade-pip lint typecheck test migrate smoke
 
 setup:
-	$(PYTHON) -m pip install --upgrade pip
 	$(PYTHON) -m pip install -e .[dev]
+
+upgrade-pip:
+	$(PYTHON) -m pip install --upgrade pip
 
 lint:
 	$(PYTHON) -m ruff check app tests
