@@ -9,11 +9,13 @@ class JsonFormatter(logging.Formatter):
             "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
-            "message": record.getMessage(),
         }
 
-        if isinstance(record.args, dict):
-            payload.update(record.args)
+        if isinstance(record.msg, dict):
+            payload.update(record.msg)
+            payload.setdefault("message", "")
+        else:
+            payload["message"] = record.getMessage()
 
         return json.dumps(payload)
 
