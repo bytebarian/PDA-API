@@ -18,26 +18,26 @@ async def request_logging_middleware(request: Request, call_next):
 
     try:
         response = await call_next(request)
+
+        duration_ms = round((time.perf_counter() - start) * 1000, 3)
+        response.headers["x-request-id"] = request_id
+
+        request_logger.info(
+            json.dumps(
+                {
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "level": "INFO",
+                    "logger": "pda.request",
+                    "message": "request.completed",
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status": response.status_code,
+                    "duration_ms": duration_ms,
+                }
+            )
+        )
+
+        return response
     finally:
         request_id_ctx.reset(token)
-
-    duration_ms = round((time.perf_counter() - start) * 1000, 3)
-    response.headers["x-request-id"] = request_id
-
-    request_logger.info(
-        json.dumps(
-            {
-                "timestamp": datetime.now(UTC).isoformat(),
-                "level": "INFO",
-                "logger": "pda.request",
-                "message": "request.completed",
-                "request_id": request_id,
-                "method": request.method,
-                "path": request.url.path,
-                "status": response.status_code,
-                "duration_ms": duration_ms,
-            }
-        )
-    )
-
-    return response
