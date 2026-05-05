@@ -13,7 +13,7 @@ test:
 	pytest
 
 migrate:
-	$(error migrate: Alembic is not configured yet. Set up Alembic before running migrations.)
+	alembic upgrade head
 
 smoke:
 	$(error smoke: No smoke tests defined yet. Add smoke tests before using this target.)
