@@ -76,6 +76,59 @@ PDA is designed as a privacy-first solution.
 - detect conflicts between agreements
 - generate reports based on contracts and official documents
 
+## Local development with Docker
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) with the Compose plugin (v2+)
+
+### Start the stack
+
+```bash
+# Copy the example environment file (first time only)
+cp .env.example .env
+
+# Build and start PostgreSQL + API
+docker compose up --build
+```
+
+The API will be available at <http://localhost:8000>.  
+PostgreSQL will be reachable on `localhost:5432`.
+
+### Stop the stack
+
+```bash
+docker compose down
+```
+
+To also remove the database volume (destructive):
+
+```bash
+docker compose down -v
+```
+
+### Verify pgvector is available
+
+After the stack is running you can confirm the extension is present:
+
+```bash
+docker compose exec db psql -U pda -d pda -c "CREATE EXTENSION IF NOT EXISTS vector; SELECT extname FROM pg_extension WHERE extname = 'vector';"
+```
+
+### Running only PostgreSQL (no API container)
+
+If you prefer to run the API outside Docker (e.g. with `uvicorn` directly), you can start just the database:
+
+```bash
+docker compose up db
+```
+
+Then set the database URL in your local `.env`:
+
+```
+PDA_DATABASE_URL=postgresql+asyncpg://pda:pda_dev@localhost:5432/pda
+```
+
 ## Project status
 
 This project is currently in the analysis and design phase.  
