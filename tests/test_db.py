@@ -15,7 +15,13 @@ def reset_db_singletons() -> Generator[None, None, None]:
 
     original_engine = db_session._engine
     original_factory = db_session._session_factory
+
+    # Ensure every test starts from a clean singleton state.
+    db_session._engine = None
+    db_session._session_factory = None
+
     yield
+
     db_session._engine = original_engine
     db_session._session_factory = original_factory
 
