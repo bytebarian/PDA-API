@@ -112,7 +112,7 @@ docker compose down -v
 After the stack is running you can confirm the extension is present:
 
 ```bash
-docker compose exec db psql -U pda -d pda -c "CREATE EXTENSION IF NOT EXISTS vector; SELECT extname FROM pg_extension WHERE extname = 'vector';"
+docker compose exec db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS vector; SELECT extname FROM pg_extension WHERE extname = '\''vector'\'';"'
 ```
 
 ### Running only PostgreSQL (no API container)
