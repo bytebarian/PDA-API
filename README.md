@@ -109,10 +109,10 @@ docker compose down -v
 
 ### Verify pgvector is available
 
-After the stack is running you can confirm the extension is present:
+After the stack is running you can confirm the extension is present (it is enabled automatically on first start):
 
 ```bash
-docker compose exec db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS vector; SELECT extname FROM pg_extension WHERE extname = '\''vector'\'';"'
+docker compose exec db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT extname FROM pg_extension WHERE extname = '\''vector'\'';"'
 ```
 
 ### Running only PostgreSQL (no API container)
@@ -123,13 +123,13 @@ If you prefer to run the API outside Docker (e.g. with `uvicorn` directly), you 
 docker compose up db
 ```
 
-Then set the database URL in your local `.env`:
+Then replace the `PDA_DATABASE_URL` line in your local `.env` with the PostgreSQL URL:
 
 ```
 PDA_DATABASE_URL=postgresql+asyncpg://pda:pda_dev@localhost:5432/pda
 ```
 
-> Replace `pda`, `pda_dev`, and the database name with the values you set in `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` in your `.env` if you changed the defaults.
+> Replace `pda`, `pda_dev`, and the database name with the values you set for `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` if you changed the defaults.
 
 ## Project status
 

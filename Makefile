@@ -13,7 +13,7 @@ test:
 	pytest
 
 migrate:
-	@echo "No migrations defined yet (Alembic setup is a future task)."
+	$(error migrate: Alembic is not configured yet. Set up Alembic before running migrations.)
 
 smoke:
-	@echo "Smoke tests not yet defined."
+	$(error smoke: No smoke tests defined yet. Add smoke tests before using this target.)
