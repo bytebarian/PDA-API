@@ -77,5 +77,3 @@ def test_engine_uses_configured_database_url(monkeypatch: pytest.MonkeyPatch) ->
     assert "test_override" in str(engine.url)
 
     get_settings.cache_clear()  # type: ignore[attr-defined]
-    db_session._engine = None
-    db_session._session_factory = None
