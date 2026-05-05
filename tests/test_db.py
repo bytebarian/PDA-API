@@ -52,13 +52,11 @@ def test_base_metadata_accessible() -> None:
 async def test_get_db_yields_async_session() -> None:
     """get_db dependency should yield an AsyncSession."""
     gen = get_db()
-    session = await gen.__anext__()
-    assert isinstance(session, AsyncSession)
-    # Exhaust the generator (triggers cleanup)
     try:
+        session = await gen.__anext__()
+        assert isinstance(session, AsyncSession)
+    finally:
         await gen.aclose()
-    except StopAsyncIteration:
-        pass
 
 
 def test_engine_uses_configured_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
