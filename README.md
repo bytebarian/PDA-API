@@ -129,6 +129,8 @@ Then set the database URL in your local `.env`:
 PDA_DATABASE_URL=postgresql+asyncpg://pda:pda_dev@localhost:5432/pda
 ```
 
+> Replace `pda`, `pda_dev`, and the database name with the values you set in `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` in your `.env` if you changed the defaults.
+
 ## Project status
 
 This project is currently in the analysis and design phase.  

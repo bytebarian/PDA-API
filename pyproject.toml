@@ -13,6 +13,9 @@ dependencies = [
     "uvicorn[standard]>=0.29.0",
 ]
 
+[tool.setuptools.packages.find]
+include = ["app*"]
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
@@ -20,3 +23,4 @@ dev = [
     "ruff>=0.4.0",
     "mypy>=1.10.0",
 ]
+
