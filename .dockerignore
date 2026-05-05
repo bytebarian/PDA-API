@@ -1,0 +1,16 @@
+# Exclude secrets and local config from the build context
+.env
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Local storage and data
+storage/
+pda.db
+
+# Development tools
+.git/
+.gitignore
