@@ -14,7 +14,8 @@ from app.db.base import Base
 config = context.config
 
 # Set the database URL from PDA settings so env vars / .env are respected.
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+database_url = get_settings().database_url.replace("%", "%%")
+config.set_main_option("sqlalchemy.url", database_url)
 
 # Set up logging as defined in alembic.ini.
 if config.config_file_name is not None:
