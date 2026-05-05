@@ -43,6 +43,16 @@ class Settings(BaseSettings):
 
         return parsed
 
+    @field_validator("api_prefix", mode="before")
+    @classmethod
+    def normalize_api_prefix(cls, value: object) -> str:
+        prefix = str(value).strip() if value is not None else ""
+        if not prefix or prefix == "/":
+            return ""
+        if not prefix.startswith("/"):
+            prefix = f"/{prefix}"
+        return prefix.rstrip("/")
+
     @field_validator("max_file_size_bytes", "ocr_dpi")
     @classmethod
     def must_be_positive(cls, value: int) -> int:
