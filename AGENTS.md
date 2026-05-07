@@ -114,7 +114,7 @@ docker compose exec db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SE
 make migrate
 ```
 
-- New migration revisions should only be created when a task explicitly changes schema. This Alpha finalization task must not change schema or existing migrations.
+- New migration revisions should only be created when a task explicitly changes schema.
 
 ## Operational endpoints
 
