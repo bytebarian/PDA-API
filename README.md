@@ -133,8 +133,7 @@ PDA_DATABASE_URL=postgresql+asyncpg://pda:pda_dev@localhost:5432/pda
 
 ## Project status
 
-This project is currently in the analysis and design phase.  
-Business, technical, and scope documentation has already been prepared, and the next steps include detailed architecture, implementation planning, and MVP scoping.
+The repository is in the Foundation phase. The backend development shell is in place with FastAPI app wiring, Docker-based local PostgreSQL + pgvector, Alembic migrations, and operational health endpoints. Higher-level business capabilities described above remain planned work for later phases.
 
 ## License
 
