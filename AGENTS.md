@@ -146,4 +146,12 @@ make test
 make migrate
 ```
 
+```powershell
+make setup → py -m pip install -e ".[dev]"
+make lint → py -m ruff check app tests
+make typecheck → py -m mypy app tests
+make test → py -m pytest
+make migrate → py -m alembic upgrade head
+```
+
 Run targeted tests early when possible, then rerun the relevant full validation before completion. Use `make smoke` only when smoke tests exist for the task being implemented.
