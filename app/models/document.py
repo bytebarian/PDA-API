@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import DateTime, Index, Integer, String, Text, Uuid, func
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
@@ -34,7 +35,8 @@ class Document(Base):
     size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     checksum_sha256: Mapped[str | None] = mapped_column(String, nullable=True)
     metadata_jsonb: Mapped[dict[str, Any] | None] = mapped_column(
-        JSON, nullable=True
+        JSON().with_variant(postgresql.JSONB(), "postgresql"),
+        nullable=True,
     )
     extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)

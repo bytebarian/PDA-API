@@ -18,6 +18,13 @@ down_revision: Union[str, Sequence[str], None] = "50f0f0555ef4"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
+# Dialect-portable type helpers
+UUID_TYPE = sa.Uuid(as_uuid=True)
+METADATA_TYPE = sa.JSON().with_variant(
+    postgresql.JSONB(astext_type=sa.Text()),
+    "postgresql",
+)
+
 
 def upgrade() -> None:
     """Create the documents table."""
@@ -25,7 +32,7 @@ def upgrade() -> None:
         "documents",
         sa.Column(
             "id",
-            postgresql.UUID(as_uuid=True),
+            UUID_TYPE,
             primary_key=True,
             nullable=False,
         ),
@@ -35,12 +42,12 @@ def upgrade() -> None:
         sa.Column("mime_type", sa.String(), nullable=True),
         sa.Column("status", sa.String(), nullable=False, server_default="awaiting"),
         sa.Column("path", sa.String(), nullable=True),
-        sa.Column("size", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("size", sa.Integer(), nullable=False, server_default=sa.text("0")),
         sa.Column("checksum_sha256", sa.String(), nullable=True),
-        sa.Column("metadata_jsonb", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("metadata_jsonb", METADATA_TYPE, nullable=True),
         sa.Column("extracted_text", sa.Text(), nullable=True),
         sa.Column("summary", sa.Text(), nullable=True),
-        sa.Column("chunk_count", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("chunk_count", sa.Integer(), nullable=False, server_default=sa.text("0")),
         sa.Column("embedding_model", sa.String(), nullable=True),
         sa.Column("last_indexed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(

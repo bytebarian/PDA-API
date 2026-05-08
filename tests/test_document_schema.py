@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timezone
 
 import pytest
+from pydantic import ValidationError
 
 from app.schemas.document import DocumentBase, DocumentCreate, DocumentRead, DocumentUpdate
 
@@ -17,7 +18,7 @@ from app.schemas.document import DocumentBase, DocumentCreate, DocumentRead, Doc
 
 def test_document_base_requires_filename() -> None:
     """DocumentBase must require a filename."""
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         DocumentBase()  # type: ignore[call-arg]
 
 
@@ -152,7 +153,7 @@ def test_document_read_from_attributes() -> None:
 def test_document_read_missing_id_raises() -> None:
     """DocumentRead must raise when id is missing."""
     now = datetime.now(tz=timezone.utc)
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         DocumentRead(  # type: ignore[call-arg]
             filename="read.pdf",
             created_at=now,
