@@ -9,6 +9,7 @@ from alembic import context
 
 from app.core.config import get_settings
 from app.db.base import Base
+import app.models  # noqa: F401 – register all ORM models with Base.metadata
 
 # Alembic Config object – provides access to values within alembic.ini.
 config = context.config
