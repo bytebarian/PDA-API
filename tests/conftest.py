@@ -6,7 +6,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
+from sqlalchemy.pool import StaticPool
 from app.db.base import Base
 import app.models  # noqa: F401 – ensure all models are registered
 
@@ -14,7 +14,12 @@ import app.models  # noqa: F401 – ensure all models are registered
 @pytest.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Yield an async SQLite in-memory session with all tables created."""
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        echo=False,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
