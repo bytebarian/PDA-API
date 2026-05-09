@@ -15,6 +15,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.document_chunk import DocumentChunk
+    from app.models.processing_job import ProcessingJob
 
 
 class Document(Base):
@@ -64,6 +65,11 @@ class Document(Base):
         back_populates="document",
         cascade="all, delete-orphan",
         order_by="DocumentChunk.chunk_index",
+    )
+    jobs: Mapped[list[ProcessingJob]] = relationship(
+        back_populates="document",
+        cascade="all, delete-orphan",
+        order_by="ProcessingJob.created_at",
     )
 
     __table_args__ = (

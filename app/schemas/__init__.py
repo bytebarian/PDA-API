@@ -5,6 +5,12 @@ from app.schemas.document_chunk import (
     DocumentChunkRead,
     DocumentChunkUpdate,
 )
+from app.schemas.processing_job import (
+    ProcessingJobBase,
+    ProcessingJobCreate,
+    ProcessingJobRead,
+    ProcessingJobUpdate,
+)
 
 __all__ = [
     "DocumentBase",
@@ -15,4 +21,8 @@ __all__ = [
     "DocumentChunkCreate",
     "DocumentChunkRead",
     "DocumentChunkUpdate",
+    "ProcessingJobBase",
+    "ProcessingJobCreate",
+    "ProcessingJobRead",
+    "ProcessingJobUpdate",
 ]
