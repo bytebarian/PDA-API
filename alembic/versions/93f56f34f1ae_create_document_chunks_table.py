@@ -8,8 +8,8 @@ Create Date: 2026-05-09 20:55:00.000000
 
 from typing import Sequence, Union
 
-from pgvector.sqlalchemy import Vector
 import sqlalchemy as sa
+from pgvector.sqlalchemy import Vector
 from sqlalchemy.dialects import postgresql
 
 from alembic import op

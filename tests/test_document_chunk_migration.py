@@ -6,13 +6,14 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
+import pytest
 from sqlalchemy import create_engine, inspect
 
 from app.core.config import get_settings
 
 
 def test_document_chunk_migration_upgrade_and_downgrade_sqlite(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """New migration should upgrade/downgrade cleanly on SQLite fallback."""
     db_path = tmp_path / "migration.sqlite3"
