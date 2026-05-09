@@ -48,7 +48,12 @@ def upgrade() -> None:
         ),
         sa.Column("error_message", sa.Text(), nullable=True),
         sa.Column("error_details_jsonb", JSON_TYPE, nullable=True),
-        sa.Column("stage_history_jsonb", JSON_TYPE, nullable=False),
+        sa.Column(
+            "stage_history_jsonb",
+            JSON_TYPE,
+            nullable=False,
+            server_default=sa.text("'[]'"),
+        ),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
