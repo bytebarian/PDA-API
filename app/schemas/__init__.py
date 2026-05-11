@@ -1,3 +1,9 @@
+from app.schemas.app_settings import (
+    AppSettingsBase,
+    AppSettingsCreate,
+    AppSettingsRead,
+    AppSettingsUpdate,
+)
 from app.schemas.document import DocumentBase, DocumentCreate, DocumentRead, DocumentUpdate
 from app.schemas.document_chunk import (
     DocumentChunkBase,
@@ -13,6 +19,10 @@ from app.schemas.processing_job import (
 )
 
 __all__ = [
+    "AppSettingsBase",
+    "AppSettingsCreate",
+    "AppSettingsRead",
+    "AppSettingsUpdate",
     "DocumentBase",
     "DocumentCreate",
     "DocumentRead",
