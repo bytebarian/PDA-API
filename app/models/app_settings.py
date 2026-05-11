@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import JSON, DateTime, Integer, String, Uuid, Boolean, func, text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.ext.mutable import MutableDict, MutableList
 
 from app.db.base import Base
 
@@ -55,7 +56,7 @@ class AppSettings(Base):
         default=DEFAULT_MAX_FILE_SIZE_BYTES,
     )
     allowed_file_types_jsonb: Mapped[list[str]] = mapped_column(
-        JSON().with_variant(postgresql.JSONB(), "postgresql"),
+        MutableList.as_mutable(JSON().with_variant(postgresql.JSONB(), "postgresql")),
         nullable=False,
         default=_default_allowed_file_types,
     )
@@ -101,7 +102,7 @@ class AppSettings(Base):
     privacy_local_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     telemetry_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     extra_settings_jsonb: Mapped[dict[str, Any]] = mapped_column(
-        JSON().with_variant(postgresql.JSONB(), "postgresql"),
+        MutableDict.as_mutable(JSON().with_variant(postgresql.JSONB(), "postgresql")),
         nullable=False,
         default=dict,
         server_default=text("'{}'"),
