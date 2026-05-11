@@ -8,18 +8,18 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-DEFAULT_STORAGE_PATH = "storage"
+DEFAULT_STORAGE_PATH = "./storage"
 DEFAULT_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
 DEFAULT_ALLOWED_FILE_TYPES = (
-    ".pdf",
-    ".docx",
-    ".doc",
-    ".txt",
-    ".md",
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".tiff",
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/msword",
+    "text/plain",
+    "text/markdown",
+    "image/png",
+    "image/jpeg",
+    "image/jpeg",
+    "image/tiff",
 )
 DEFAULT_OCR_PROVIDER = "tesseract"
 DEFAULT_OCR_LANGUAGE = "eng"
