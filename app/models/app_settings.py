@@ -14,12 +14,12 @@ from app.db.base import Base
 
 DEFAULT_STORAGE_PATH = "./storage"
 DEFAULT_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
-DEFAULT_ALLOWED_FILE_TYPES = [
+DEFAULT_ALLOWED_FILE_TYPES = (
     "application/pdf",
     "text/plain",
     "image/png",
     "image/jpeg",
-]
+)
 DEFAULT_OCR_PROVIDER = "tesseract"
 DEFAULT_OCR_LANGUAGE = "eng"
 DEFAULT_OCR_DPI = 300
