@@ -31,12 +31,18 @@ DEFAULT_LLM_PROVIDER = "openai"
 DEFAULT_LLM_MODEL = "gpt-4o-mini"
 
 
+def _default_allowed_file_types_jsonb() -> list[str]:
+    """Return a fresh copy of the default allowed file types."""
+
+    return list(DEFAULT_ALLOWED_FILE_TYPES)
+
+
 class AppSettingsBase(BaseModel):
     """Fields shared across create/read/update operations."""
 
     storage_path: str = DEFAULT_STORAGE_PATH
     max_file_size_bytes: int = DEFAULT_MAX_FILE_SIZE_BYTES
-    allowed_file_types_jsonb: list[str] = Field(default_factory=lambda: list(DEFAULT_ALLOWED_FILE_TYPES))
+    allowed_file_types_jsonb: list[str] = Field(default_factory=_default_allowed_file_types_jsonb)
     ocr_enabled: bool = True
     ocr_provider: str | None = DEFAULT_OCR_PROVIDER
     ocr_language: str | None = DEFAULT_OCR_LANGUAGE
