@@ -8,19 +8,33 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.app_settings import (
-    DEFAULT_ALLOWED_FILE_TYPES,
-    DEFAULT_CHUNK_OVERLAP,
-    DEFAULT_CHUNK_SIZE,
-    DEFAULT_EMBEDDING_DIMENSIONS,
-    DEFAULT_LLM_MODEL,
-    DEFAULT_LLM_PROVIDER,
-    DEFAULT_MAX_FILE_SIZE_BYTES,
-    DEFAULT_OCR_DPI,
-    DEFAULT_OCR_LANGUAGE,
-    DEFAULT_OCR_PROVIDER,
-    DEFAULT_STORAGE_PATH,
+DEFAULT_STORAGE_PATH = "storage"
+DEFAULT_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
+DEFAULT_ALLOWED_FILE_TYPES = (
+    ".pdf",
+    ".docx",
+    ".doc",
+    ".txt",
+    ".md",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".tiff",
 )
+DEFAULT_OCR_PROVIDER = "tesseract"
+DEFAULT_OCR_LANGUAGE = "eng"
+DEFAULT_OCR_DPI = 300
+DEFAULT_CHUNK_SIZE = 1000
+DEFAULT_CHUNK_OVERLAP = 200
+DEFAULT_EMBEDDING_DIMENSIONS = 384
+DEFAULT_LLM_PROVIDER = "openai"
+DEFAULT_LLM_MODEL = "gpt-4o-mini"
+
+
+def _default_allowed_file_types_jsonb() -> list[str]:
+    """Return a fresh copy of the default allowed file types."""
+
+    return list(DEFAULT_ALLOWED_FILE_TYPES)
 
 
 class AppSettingsBase(BaseModel):
@@ -28,7 +42,7 @@ class AppSettingsBase(BaseModel):
 
     storage_path: str = DEFAULT_STORAGE_PATH
     max_file_size_bytes: int = DEFAULT_MAX_FILE_SIZE_BYTES
-    allowed_file_types_jsonb: list[str] = Field(default_factory=lambda: list(DEFAULT_ALLOWED_FILE_TYPES))
+    allowed_file_types_jsonb: list[str] = Field(default_factory=_default_allowed_file_types_jsonb)
     ocr_enabled: bool = True
     ocr_provider: str | None = DEFAULT_OCR_PROVIDER
     ocr_language: str | None = DEFAULT_OCR_LANGUAGE
