@@ -23,7 +23,7 @@ def test_app_settings_migration_upgrade_and_downgrade_sqlite(
     alembic_ini = Path(__file__).resolve().parents[1] / "alembic.ini"
     config = Config(str(alembic_ini))
 
-    command.upgrade(config, "head")
+    command.upgrade(config, "d89ec8d9a902")
 
     engine = create_engine(f"sqlite:///{db_path}")
     try:
