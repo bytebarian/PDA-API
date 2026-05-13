@@ -7,7 +7,7 @@ Currently exposes:
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -17,6 +17,29 @@ from app.services.ingestion import ingest_upload
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
+UPLOAD_READ_CHUNK_SIZE = 1024 * 1024
+
+async def read_upload_limited(file: UploadFile, max_bytes: int) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+
+    while True:
+        chunk = await file.read(UPLOAD_READ_CHUNK_SIZE)
+        if not chunk:
+            break
+
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail=(
+                    f"File size exceeds the maximum allowed {max_bytes} bytes."
+                ),
+            )
+
+        chunks.append(chunk)
+
+    return b"".join(chunks)
 
 @router.post(
     "/upload",
@@ -38,7 +61,7 @@ async def upload_document(
     - Creates a **Document** row and a linked **ProcessingJob** row.
     - Returns document and job identifiers plus initial status values.
     """
-    data = await file.read()
+    data = await read_upload_limited(file, settings.max_file_size_bytes)
     content_type = file.content_type or ""
 
     document, job = await ingest_upload(

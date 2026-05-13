@@ -227,3 +227,34 @@ def test_sanitize_filename_preserves_safe_name() -> None:
     from app.services.file_storage import sanitize_filename
 
     assert sanitize_filename("my_document.pdf") == "my_document.pdf"
+
+
+def test_upload_same_filename_creates_distinct_files(client: TestClient, tmp_path: Path) -> None:
+    first = client.post(
+        "/documents/upload",
+        files={"file": ("report.pdf", io.BytesIO(b"%PDF first"), "application/pdf")},
+    )
+    second = client.post(
+        "/documents/upload",
+        files={"file": ("report.pdf", io.BytesIO(b"%PDF second"), "application/pdf")},
+    )
+
+    assert first.status_code == 201, first.text
+    assert second.status_code == 201, second.text
+
+    stored_files = list(tmp_path.iterdir())
+    assert len(stored_files) == 2
+    assert {p.read_bytes() for p in stored_files} == {b"%PDF first", b"%PDF second"}
+
+    assert first.json()["filename"] == "report.pdf"
+    assert second.json()["filename"] == "report.pdf"
+
+def test_allowed_file_types_accepts_json_style_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PDA_ALLOWED_FILE_TYPES", '["application/pdf","text/plain"]')
+    get_settings.cache_clear()
+
+    try:
+        settings = get_settings()
+        assert settings.allowed_file_types == ("application/pdf", "text/plain")
+    finally:
+        get_settings.cache_clear()

@@ -15,7 +15,7 @@ from app.core.config import Settings
 from app.domain.status import DocumentStatus, ProcessingJobStage, ProcessingJobStatus
 from app.models.document import Document
 from app.models.processing_job import ProcessingJob
-from app.services.file_storage import save_file
+from app.services.file_storage import sanitize_filename, save_file
 
 
 async def ingest_upload(
@@ -50,13 +50,18 @@ async def ingest_upload(
         )
 
     # --- MIME type validation ---------------------------------------------------
+    allowed_types = {
+        item.strip().lower().strip('"').strip("'")
+        for item in settings.allowed_file_types
+        if item.strip()
+    }
     normalised_ct = content_type.split(";")[0].strip().lower()
-    if normalised_ct not in settings.allowed_file_types:
+    if normalised_ct not in allowed_types:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail=(
                 f"File type '{normalised_ct}' is not allowed. "
-                f"Accepted types: {', '.join(settings.allowed_file_types)}."
+                f"Accepted types: {', '.join(sorted(allowed_types))}."
             ),
         )
 
@@ -66,7 +71,7 @@ async def ingest_upload(
 
     # Derive the sanitized name from the stored path so there is a single
     # source of truth (save_file's own sanitization).
-    safe_name = file_path.name
+    safe_name = sanitize_filename(filename)
 
     # Determine a simple file-type label from the extension or MIME type.
     suffix = Path(safe_name).suffix.lstrip(".").lower() or normalised_ct.split("/")[-1]

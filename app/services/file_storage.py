@@ -57,7 +57,8 @@ def save_file(storage_path: Path, filename: str, data: bytes) -> tuple[Path, str
     safe_name = sanitize_filename(filename)
     storage_path.mkdir(parents=True, exist_ok=True)
 
-    dest = storage_path / safe_name
+    unique_name = f"{uuid.uuid4().hex}_{safe_name}"
+    dest = storage_path / unique_name
     dest.write_bytes(data)
 
     checksum = compute_sha256(data)
