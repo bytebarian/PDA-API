@@ -9,6 +9,10 @@ import pytest
 from pydantic import ValidationError
 
 from app.schemas.app_settings import (
+    DEFAULT_ALLOWED_FILE_TYPES,
+    DEFAULT_EMBEDDING_DIMENSIONS,
+    DEFAULT_LLM_MODEL,
+    DEFAULT_LLM_PROVIDER,
     AppSettingsBase,
     AppSettingsCreate,
     AppSettingsRead,
@@ -21,12 +25,7 @@ def test_app_settings_base_defaults() -> None:
     settings = AppSettingsBase()
     assert settings.storage_path == "./storage"
     assert settings.max_file_size_bytes == 10 * 1024 * 1024
-    assert settings.allowed_file_types_jsonb == [
-        "application/pdf",
-        "text/plain",
-        "image/png",
-        "image/jpeg",
-    ]
+    assert settings.allowed_file_types_jsonb == list(DEFAULT_ALLOWED_FILE_TYPES)
     assert settings.ocr_enabled is True
     assert settings.ocr_provider == "tesseract"
     assert settings.ocr_language == "eng"
@@ -35,9 +34,9 @@ def test_app_settings_base_defaults() -> None:
     assert settings.chunk_overlap == 200
     assert settings.embedding_provider is None
     assert settings.embedding_model is None
-    assert settings.embedding_dimensions == 1536
-    assert settings.llm_provider == "local"
-    assert settings.llm_model == "llama3.1:8b-instruct"
+    assert settings.embedding_dimensions == DEFAULT_EMBEDDING_DIMENSIONS
+    assert settings.llm_provider == DEFAULT_LLM_PROVIDER
+    assert settings.llm_model == DEFAULT_LLM_MODEL
     assert settings.privacy_local_only is True
     assert settings.telemetry_enabled is False
     assert settings.extra_settings_jsonb == {}
