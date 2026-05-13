@@ -135,3 +135,22 @@ async def test_processing_job_json_and_timestamps_roundtrip(
     assert job.stage_history_jsonb == [{"stage": "queued"}, {"stage": "ocr"}]
     assert job.started_at == started_at
     assert job.completed_at == completed_at
+
+
+async def test_processing_job_stage_history_append_persists(
+    db_session: AsyncSession,
+) -> None:
+    """In-place append on stage_history_jsonb should be tracked and persisted."""
+    document = Document(filename="mutable-stage-history.pdf")
+    db_session.add(document)
+    await db_session.flush()
+
+    job = ProcessingJob(document_id=document.id, stage_history_jsonb=[{"stage": "queued"}])
+    db_session.add(job)
+    await db_session.commit()
+
+    job.stage_history_jsonb.append({"stage": "ocr"})
+    await db_session.commit()
+    await db_session.refresh(job)
+
+    assert job.stage_history_jsonb == [{"stage": "queued"}, {"stage": "ocr"}]
