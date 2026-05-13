@@ -53,7 +53,7 @@ def test_processing_job_update_all_optional() -> None:
 
 def test_processing_job_update_partial_payload() -> None:
     """ProcessingJobUpdate accepts a subset of fields."""
-    update = ProcessingJobUpdate(status="processing", stage="chunking", attempt_count=1)
+    update = ProcessingJobUpdate(status="processing", stage="chunking", attempt_count=1)  # type: ignore[arg-type]
     assert update.status == "processing"
     assert update.stage == "chunking"
     assert update.attempt_count == 1

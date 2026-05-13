@@ -22,6 +22,7 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.domain.status import ProcessingJobStage, ProcessingJobStatus
 
 if TYPE_CHECKING:
     from app.models.document import Document
@@ -43,8 +44,8 @@ class ProcessingJob(Base):
         nullable=False,
         index=True,
     )
-    status: Mapped[str] = mapped_column(String, nullable=False, default="awaiting")
-    stage: Mapped[str] = mapped_column(String, nullable=False, default="queued")
+    status: Mapped[str] = mapped_column(String, nullable=False, default=ProcessingJobStatus.awaiting.value)
+    stage: Mapped[str] = mapped_column(String, nullable=False, default=ProcessingJobStage.queued.value)
     attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)

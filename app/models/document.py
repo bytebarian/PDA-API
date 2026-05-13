@@ -12,6 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
 from app.db.base import Base
+from app.domain.status import DocumentStatus
 
 if TYPE_CHECKING:
     from app.models.document_chunk import DocumentChunk
@@ -33,7 +34,7 @@ class Document(Base):
     file_type: Mapped[str | None] = mapped_column(String, nullable=True)
     mime_type: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(
-        String, nullable=False, default="awaiting"
+        String, nullable=False, default=DocumentStatus.awaiting.value
     )
     path: Mapped[str | None] = mapped_column(String, nullable=True)
     size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
