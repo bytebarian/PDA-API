@@ -48,7 +48,7 @@ def test_document_base_full_payload() -> None:
         category="finance",
         file_type="pdf",
         mime_type="application/pdf",
-        status="ready",
+        status="ready",  # type: ignore[arg-type]
         path="/uploads/report.pdf",
         size=4096,
         checksum_sha256="deadbeef",
@@ -81,7 +81,7 @@ def test_document_create_accepts_full_payload() -> None:
     doc = DocumentCreate(
         filename="upload.pdf",
         category="legal",
-        status="awaiting",
+        status="awaiting",  # type: ignore[arg-type]
     )
     assert doc.filename == "upload.pdf"
     assert doc.category == "legal"
@@ -102,7 +102,7 @@ def test_document_update_all_optional() -> None:
 
 def test_document_update_partial_payload() -> None:
     """DocumentUpdate accepts a subset of fields."""
-    update = DocumentUpdate(status="processing", chunk_count=3)
+    update = DocumentUpdate(status="processing", chunk_count=3)  # type: ignore[arg-type]
     assert update.status == "processing"
     assert update.chunk_count == 3
     assert update.filename is None

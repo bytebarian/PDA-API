@@ -4,19 +4,19 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-ProcessingJobStatus = Literal["awaiting", "processing", "ready", "failed"]
+from app.domain.status import ProcessingJobStage, ProcessingJobStatus
 
 
 class ProcessingJobBase(BaseModel):
     """Fields shared across create/read/update operations."""
 
     document_id: uuid.UUID
-    status: ProcessingJobStatus = "awaiting"
-    stage: str = "queued"
+    status: ProcessingJobStatus = ProcessingJobStatus.awaiting
+    stage: ProcessingJobStage = ProcessingJobStage.queued
     attempt_count: int = 0
     max_attempts: int = 3
     error_message: str | None = None
@@ -34,7 +34,7 @@ class ProcessingJobUpdate(BaseModel):
     """Schema for partially updating an existing processing job."""
 
     status: ProcessingJobStatus | None = None
-    stage: str | None = None
+    stage: ProcessingJobStage | None = None
     attempt_count: int | None = None
     max_attempts: int | None = None
     error_message: str | None = None

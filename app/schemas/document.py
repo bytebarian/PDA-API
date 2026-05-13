@@ -8,6 +8,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from app.domain.status import DocumentStatus
+
 
 class DocumentBase(BaseModel):
     """Fields shared across create/read/update operations."""
@@ -16,7 +18,7 @@ class DocumentBase(BaseModel):
     category: str | None = None
     file_type: str | None = None
     mime_type: str | None = None
-    status: str = "awaiting"
+    status: DocumentStatus = DocumentStatus.awaiting
     path: str | None = None
     size: int = 0
     checksum_sha256: str | None = None
@@ -39,7 +41,7 @@ class DocumentUpdate(BaseModel):
     category: str | None = None
     file_type: str | None = None
     mime_type: str | None = None
-    status: str | None = None
+    status: DocumentStatus | None = None
     path: str | None = None
     size: int | None = None
     checksum_sha256: str | None = None
