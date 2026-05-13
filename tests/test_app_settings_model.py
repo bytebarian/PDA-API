@@ -139,3 +139,36 @@ async def test_app_settings_json_fields_roundtrip(db_session: AsyncSession) -> N
 
     assert payload.allowed_file_types_jsonb == ["application/pdf", "text/markdown"]
     assert payload.extra_settings_jsonb == {"feature_flags": {"ocr": True}}
+
+
+async def test_app_settings_allowed_file_types_append_persists(
+    db_session: AsyncSession,
+) -> None:
+    """In-place append on allowed_file_types_jsonb should be tracked and persisted."""
+    settings = AppSettings(allowed_file_types_jsonb=["application/pdf"])
+    db_session.add(settings)
+    await db_session.commit()
+
+    settings.allowed_file_types_jsonb.append("text/markdown")
+    await db_session.commit()
+    await db_session.refresh(settings)
+
+    assert settings.allowed_file_types_jsonb == ["application/pdf", "text/markdown"]
+
+
+async def test_app_settings_extra_settings_top_level_assignment_persists(
+    db_session: AsyncSession,
+) -> None:
+    """Top-level assignment on extra_settings_jsonb should be tracked and persisted."""
+    settings = AppSettings(extra_settings_jsonb={"feature_flags": {"ocr": True}})
+    db_session.add(settings)
+    await db_session.commit()
+
+    settings.extra_settings_jsonb["beta_enabled"] = True
+    await db_session.commit()
+    await db_session.refresh(settings)
+
+    assert settings.extra_settings_jsonb == {
+        "feature_flags": {"ocr": True},
+        "beta_enabled": True,
+    }

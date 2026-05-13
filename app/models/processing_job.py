@@ -19,6 +19,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -54,7 +55,7 @@ class ProcessingJob(Base):
         nullable=True,
     )
     stage_history_jsonb: Mapped[list[Any]] = mapped_column(
-        JSON().with_variant(postgresql.JSONB(), "postgresql"),
+        MutableList.as_mutable(JSON().with_variant(postgresql.JSONB(), "postgresql")),
         nullable=False,
         default=list,
         server_default=text("'[]'"),
