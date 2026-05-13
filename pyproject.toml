@@ -9,6 +9,7 @@ description = "PDA FastAPI backend skeleton"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.111.0",
+    "python-multipart>=0.0.27",
     "pydantic-settings>=2.3.0",
     "uvicorn[standard]>=0.29.0",
     "sqlalchemy[asyncio]>=2.0.0",
