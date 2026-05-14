@@ -33,6 +33,16 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 UPLOAD_READ_CHUNK_SIZE = 1024 * 1024
 
+
+def _escape_like_pattern(value: str) -> str:
+    """Escape SQL LIKE wildcard characters in *value* for literal substring matching.
+
+    Escapes backslash first (the chosen escape character), then ``%`` and
+    ``_``, so the caller can safely pass the result to
+    ``ColumnElement.ilike(f"%{result}%", escape="\\")``.
+    """
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
 async def read_upload_limited(file: UploadFile, max_bytes: int) -> bytes:
     chunks: list[bytes] = []
     total = 0
@@ -130,8 +140,7 @@ async def list_documents(
     if file_type is not None:
         filters.append(Document.file_type == file_type)
     if q is not None:
-        escaped_q = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        filters.append(Document.filename.ilike(f"%{escaped_q}%", escape="\\"))
+        filters.append(Document.filename.ilike(f"%{_escape_like_pattern(q)}%", escape="\\"))
 
     count_stmt = select(func.count()).select_from(Document)
     if filters:

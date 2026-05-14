@@ -472,8 +472,9 @@ async def test_list_documents_q_literal_percent_wildcard(
     await _insert_document(db_session, filename="file%report.pdf")
     await _insert_document(db_session, filename="other.pdf")
 
-    # Without escaping, ilike("%%%") matches every non-empty filename.
-    # With proper escaping only the file whose name contains a literal % is returned.
+    # Without escaping ilike receives the pattern "%%%", which collapses to "%"
+    # and matches every filename.  With escaping the pattern becomes "%\%%"
+    # (escape="\\"), so only filenames containing a literal % are returned.
     response = client.get("/documents?q=%25")  # %25 is URL-encoded %
     body = response.json()
     assert body["total"] == 1
