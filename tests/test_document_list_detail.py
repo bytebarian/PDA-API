@@ -1,4 +1,8 @@
-"""Tests for GET /documents and GET /documents/{document_id}."""
+"""Tests for GET /documents and GET /documents/{document_id}.
+
+Request paths use no prefix because the default ``Settings.api_prefix``
+normalises to an empty string (""), consistent with the existing upload tests.
+"""
 
 from __future__ import annotations
 
@@ -447,4 +451,10 @@ def test_list_documents_invalid_page_size(client: TestClient) -> None:
 def test_list_documents_invalid_page(client: TestClient) -> None:
     """page < 1 must be rejected with 422."""
     response = client.get("/documents?page=0")
+    assert response.status_code == 422
+
+
+def test_list_documents_invalid_sort(client: TestClient) -> None:
+    """sort values other than 'newest' or 'oldest' must be rejected with 422."""
+    response = client.get("/documents?sort=random")
     assert response.status_code == 422

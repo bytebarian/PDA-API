@@ -9,7 +9,7 @@ Exposes:
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
@@ -105,11 +105,11 @@ async def list_documents(
     db: AsyncSession = Depends(get_db),
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
-    status: Annotated[DocumentStatus | None, Query()] = None,
+    document_status: Annotated[DocumentStatus | None, Query(alias="status")] = None,
     category: Annotated[str | None, Query()] = None,
     file_type: Annotated[str | None, Query()] = None,
     q: Annotated[str | None, Query()] = None,
-    sort: Annotated[str, Query()] = "newest",
+    sort: Annotated[Literal["newest", "oldest"], Query()] = "newest",
 ) -> DocumentListResponse:
     """Return a paginated list of documents with optional filters.
 
@@ -123,8 +123,8 @@ async def list_documents(
     - **sort**: ``newest`` (default) or ``oldest``
     """
     filters = []
-    if status is not None:
-        filters.append(Document.status == status.value)
+    if document_status is not None:
+        filters.append(Document.status == document_status.value)
     if category is not None:
         filters.append(Document.category == category)
     if file_type is not None:
@@ -137,11 +137,12 @@ async def list_documents(
         count_stmt = count_stmt.where(*filters)
     total: int = (await db.execute(count_stmt)).scalar_one()
 
-    order_col = (
-        Document.created_at.asc() if sort == "oldest" else Document.created_at.desc()
-    )
+    if sort == "oldest":
+        order_cols = (Document.created_at.asc(), Document.id.asc())
+    else:
+        order_cols = (Document.created_at.desc(), Document.id.desc())
     offset = (page - 1) * page_size
-    list_stmt = select(Document).where(*filters).order_by(order_col).offset(offset).limit(page_size)
+    list_stmt = select(Document).where(*filters).order_by(*order_cols).offset(offset).limit(page_size)
     rows = (await db.execute(list_stmt)).scalars().all()
 
     items = [DocumentSummary.model_validate(row) for row in rows]
@@ -169,7 +170,7 @@ async def get_document(
     job_stmt = (
         select(ProcessingJob)
         .where(ProcessingJob.document_id == document_id)
-        .order_by(ProcessingJob.created_at.desc())
+        .order_by(ProcessingJob.created_at.desc(), ProcessingJob.id.desc())
         .limit(1)
     )
     job_row = (await db.execute(job_stmt)).scalars().first()
