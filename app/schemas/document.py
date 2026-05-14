@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from app.domain.status import DocumentStatus
+from app.domain.status import DocumentStatus, ProcessingJobStage, ProcessingJobStatus
 
 
 class DocumentBase(BaseModel):
@@ -61,3 +61,69 @@ class DocumentRead(DocumentBase):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# List / detail response schemas
+# ---------------------------------------------------------------------------
+
+
+class DocumentSummary(BaseModel):
+    """Stable summary fields returned in the list endpoint."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    filename: str
+    category: str | None
+    file_type: str | None
+    status: DocumentStatus
+    size: int
+    chunk_count: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProcessingJobSummary(BaseModel):
+    """Condensed view of the most recent processing job for a document."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    status: ProcessingJobStatus
+    stage: ProcessingJobStage
+    error_message: str | None
+    started_at: datetime | None
+    completed_at: datetime | None
+    created_at: datetime
+
+
+class DocumentDetail(BaseModel):
+    """Full document detail including optional processing job summary."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    filename: str
+    category: str | None
+    file_type: str | None
+    mime_type: str | None
+    status: DocumentStatus
+    size: int
+    checksum_sha256: str | None
+    summary: str | None
+    chunk_count: int
+    embedding_model: str | None
+    last_indexed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    latest_job: ProcessingJobSummary | None
+
+
+class DocumentListResponse(BaseModel):
+    """Paginated list of document summaries."""
+
+    items: list[DocumentSummary]
+    page: int
+    page_size: int
+    total: int
