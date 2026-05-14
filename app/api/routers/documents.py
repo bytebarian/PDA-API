@@ -137,12 +137,19 @@ async def list_documents(
         count_stmt = count_stmt.where(*filters)
     total: int = (await db.execute(count_stmt)).scalar_one()
 
-    if sort == "oldest":
-        order_cols = (Document.created_at.asc(), Document.id.asc())
-    else:
-        order_cols = (Document.created_at.desc(), Document.id.desc())
+    order_by_clauses = (
+        (Document.created_at.asc(), Document.id.asc())
+        if sort == "oldest"
+        else (Document.created_at.desc(), Document.id.desc())
+    )
     offset = (page - 1) * page_size
-    list_stmt = select(Document).where(*filters).order_by(*order_cols).offset(offset).limit(page_size)
+    list_stmt = (
+        select(Document)
+        .where(*filters)
+        .order_by(*order_by_clauses)
+        .offset(offset)
+        .limit(page_size)
+    )
     rows = (await db.execute(list_stmt)).scalars().all()
 
     items = [DocumentSummary.model_validate(row) for row in rows]
