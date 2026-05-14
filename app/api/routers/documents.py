@@ -130,7 +130,8 @@ async def list_documents(
     if file_type is not None:
         filters.append(Document.file_type == file_type)
     if q is not None:
-        filters.append(Document.filename.ilike(f"%{q}%"))
+        escaped_q = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        filters.append(Document.filename.ilike(f"%{escaped_q}%", escape="\\"))
 
     count_stmt = select(func.count()).select_from(Document)
     if filters:

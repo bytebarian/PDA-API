@@ -458,3 +458,38 @@ def test_list_documents_invalid_sort(client: TestClient) -> None:
     """sort values other than 'newest' or 'oldest' must be rejected with 422."""
     response = client.get("/documents?sort=random")
     assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# GET /documents – q wildcard escaping
+# ---------------------------------------------------------------------------
+
+
+async def test_list_documents_q_literal_percent_wildcard(
+    client: TestClient, db_session: AsyncSession
+) -> None:
+    """q=% must match only filenames containing a literal %, not every filename."""
+    await _insert_document(db_session, filename="file%report.pdf")
+    await _insert_document(db_session, filename="other.pdf")
+
+    # Without escaping, ilike("%%%") matches every non-empty filename.
+    # With proper escaping only the file whose name contains a literal % is returned.
+    response = client.get("/documents?q=%25")  # %25 is URL-encoded %
+    body = response.json()
+    assert body["total"] == 1
+    assert "%" in body["items"][0]["filename"]
+
+
+async def test_list_documents_q_literal_underscore_wildcard(
+    client: TestClient, db_session: AsyncSession
+) -> None:
+    """q=_ must match only filenames with a literal _, not act as a single-char wildcard."""
+    await _insert_document(db_session, filename="file_name.pdf")
+    await _insert_document(db_session, filename="filename.pdf")
+
+    # Without escaping, ilike("%_%") matches any filename with ≥ 1 character (both rows).
+    # With escaping only the filename containing a literal _ is returned.
+    response = client.get("/documents?q=_")
+    body = response.json()
+    assert body["total"] == 1
+    assert "_" in body["items"][0]["filename"]
