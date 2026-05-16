@@ -121,6 +121,22 @@ async def test_download_document_falls_back_to_octet_stream(
     assert response.headers["content-type"] == "application/octet-stream"
 
 
+async def test_download_document_sanitizes_control_chars_in_filename(
+    client: TestClient, db_session: AsyncSession, tmp_path: Path
+) -> None:
+    stored = tmp_path / "safe.pdf"
+    stored.write_bytes(b"ok")
+    doc = await _insert_document(
+        db_session,
+        filename="bad\nname.pdf",
+        path=str(stored),
+    )
+
+    response = client.get(f"/documents/{doc.id}/download")
+    assert response.status_code == 200
+    assert 'filename="bad_name.pdf"' in response.headers["content-disposition"]
+
+
 def test_download_missing_document_returns_404(client: TestClient) -> None:
     response = client.get(f"/documents/{uuid.uuid4()}/download")
     assert response.status_code == 404

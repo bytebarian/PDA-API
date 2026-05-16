@@ -68,9 +68,11 @@ def save_file(storage_path: Path, filename: str, data: bytes) -> tuple[Path, str
 def _is_within_root(path: Path, root: Path) -> bool:
     """Return True when *path* is inside *root*."""
     try:
-        path.relative_to(root)
+        resolved_path = path.resolve(strict=True)
+        resolved_root = root.resolve(strict=True)
+        resolved_path.relative_to(resolved_root)
         return True
-    except ValueError:
+    except (FileNotFoundError, ValueError):
         return False
 
 
