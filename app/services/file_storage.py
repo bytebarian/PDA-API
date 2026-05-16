@@ -83,14 +83,21 @@ def resolve_stored_file_path(storage_path: Path, stored_path: str) -> Path | Non
     if not stored_path.strip():
         return None
 
-    root = storage_path.resolve(strict=False)
+    try:
+        root = storage_path.resolve(strict=True)
+    except FileNotFoundError:
+        return None
+
     raw = Path(stored_path)
 
     # Support both absolute paths and legacy relative values that may have been
     # stored either as "<storage>/<file>" or just "<file>".
     candidates = [raw] if raw.is_absolute() else [raw, root / raw]
     for candidate in candidates:
-        resolved = candidate.resolve(strict=False)
+        try:
+            resolved = candidate.resolve(strict=True)
+        except FileNotFoundError:
+            continue
         if _is_within_root(resolved, root):
             return resolved
 
