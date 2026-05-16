@@ -68,6 +68,7 @@ async def _insert_document(
     mime_type: str | None = "application/pdf",
     path: str | None,
 ) -> Document:
+    """Insert a minimal Document row for download endpoint tests."""
     doc = Document(
         filename=filename,
         mime_type=mime_type,

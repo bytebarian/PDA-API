@@ -77,6 +77,10 @@ def _is_within_root(path: Path, root: Path) -> bool:
 def resolve_stored_file_path(storage_path: Path, stored_path: str) -> Path | None:
     """Resolve a persisted document path, constrained to *storage_path*.
 
+    Args:
+        storage_path: Configured storage root directory.
+        stored_path: Persisted absolute or relative path from the Document row.
+
     Returns None when the path is empty or resolves outside the configured
     storage root.
     """
