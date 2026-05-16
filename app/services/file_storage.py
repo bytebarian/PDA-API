@@ -96,7 +96,21 @@ def resolve_stored_file_path(storage_path: Path, stored_path: str) -> Path | Non
 
     # Absolute values are validated directly. Relative values are always
     # resolved from the configured storage root, never from process CWD.
-    candidates = [raw] if raw.is_absolute() else [root / raw]
+    candidates: list[Path]
+
+    if raw.is_absolute():
+        candidates = [raw]
+    else:
+        candidates = [root / raw]
+
+        # Support paths persisted as "storage/<file>" when storage_path is "./storage".
+        try:
+            raw_parts = raw.parts
+            root_name = root.name
+            if raw_parts and raw_parts[0] == root_name:
+                candidates.append(root.parent / raw)
+        except OSError:
+            pass
     for candidate in candidates:
         try:
             resolved = candidate.resolve(strict=True)
