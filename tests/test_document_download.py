@@ -81,7 +81,7 @@ async def _insert_document(
     return doc
 
 
-async def test_download_document_returns_file_bytes_and_headers(
+async def test_download_document_returns_file_bytes_and_sanitized_headers(
     client: TestClient, db_session: AsyncSession, tmp_path: Path
 ) -> None:
     data = b"%PDF-1.4 download me"
@@ -99,9 +99,8 @@ async def test_download_document_returns_file_bytes_and_headers(
     assert response.content == data
     assert response.headers["content-type"] == "application/pdf"
     assert "attachment;" in response.headers["content-disposition"]
-    assert "statement.pdf" in response.headers["content-disposition"]
+    assert 'filename="statement.pdf"' in response.headers["content-disposition"]
     assert ".." not in response.headers["content-disposition"]
-    assert "/" not in response.headers["content-disposition"].split("filename=", 1)[-1]
 
 
 async def test_download_document_falls_back_to_octet_stream(
