@@ -165,3 +165,18 @@ async def test_download_path_outside_storage_root_returns_404(
 
     response = client.get(f"/documents/{doc.id}/download")
     assert response.status_code == 404
+
+
+async def test_download_traversal_path_returns_404(
+    client: TestClient, db_session: AsyncSession, tmp_path: Path
+) -> None:
+    outside_file = tmp_path.parent / "traversal.pdf"
+    outside_file.write_bytes(b"outside")
+    doc = await _insert_document(
+        db_session,
+        filename="traversal.pdf",
+        path="../traversal.pdf",
+    )
+
+    response = client.get(f"/documents/{doc.id}/download")
+    assert response.status_code == 404

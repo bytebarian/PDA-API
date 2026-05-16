@@ -86,6 +86,8 @@ def resolve_stored_file_path(storage_path: Path, stored_path: str) -> Path | Non
     root = storage_path.resolve(strict=False)
     raw = Path(stored_path)
 
+    # Support both absolute paths and legacy relative values that may have been
+    # stored either as "<storage>/<file>" or just "<file>".
     candidates = [raw] if raw.is_absolute() else [raw, root / raw]
     for candidate in candidates:
         resolved = candidate.resolve(strict=False)
