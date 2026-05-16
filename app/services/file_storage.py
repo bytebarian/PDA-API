@@ -63,3 +63,33 @@ def save_file(storage_path: Path, filename: str, data: bytes) -> tuple[Path, str
 
     checksum = compute_sha256(data)
     return dest, checksum
+
+
+def _is_within_root(path: Path, root: Path) -> bool:
+    """Return True when *path* is inside *root*."""
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def resolve_stored_file_path(storage_path: Path, stored_path: str) -> Path | None:
+    """Resolve a persisted document path, constrained to *storage_path*.
+
+    Returns None when the path is empty or resolves outside the configured
+    storage root.
+    """
+    if not stored_path.strip():
+        return None
+
+    root = storage_path.resolve(strict=False)
+    raw = Path(stored_path)
+
+    candidates = [raw] if raw.is_absolute() else [raw, root / raw]
+    for candidate in candidates:
+        resolved = candidate.resolve(strict=False)
+        if _is_within_root(resolved, root):
+            return resolved
+
+    return None

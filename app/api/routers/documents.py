@@ -9,9 +9,11 @@ Exposes:
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +30,7 @@ from app.schemas.document import (
 )
 from app.schemas.upload import UploadResponse
 from app.services.ingestion import ingest_upload
+from app.services.file_storage import resolve_stored_file_path, sanitize_filename
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -212,4 +215,31 @@ async def get_document(
         created_at=doc_row.created_at,
         updated_at=doc_row.updated_at,
         latest_job=latest_job,
+    )
+
+
+@router.get(
+    "/{document_id}/download",
+    summary="Download original document file",
+)
+async def download_document(
+    document_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> FileResponse:
+    """Stream the original uploaded file for a document."""
+    document = await db.get(Document, document_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    storage_root = Path(settings.storage_path)
+    stored_path = document.path or ""
+    resolved_path = resolve_stored_file_path(storage_root, stored_path)
+    if resolved_path is None or not resolved_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found")
+
+    return FileResponse(
+        path=resolved_path,
+        media_type=document.mime_type or "application/octet-stream",
+        filename=sanitize_filename(document.filename),
     )
