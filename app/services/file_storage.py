@@ -89,7 +89,7 @@ def resolve_stored_file_path(storage_path: Path, stored_path: str) -> Path | Non
 
     try:
         root = storage_path.resolve(strict=True)
-    except FileNotFoundError:
+    except OSError:
         return None
 
     raw = Path(stored_path)
@@ -100,7 +100,7 @@ def resolve_stored_file_path(storage_path: Path, stored_path: str) -> Path | Non
     for candidate in candidates:
         try:
             resolved = candidate.resolve(strict=True)
-        except FileNotFoundError:
+        except OSError:
             continue
         if _is_within_root(resolved, root):
             return resolved

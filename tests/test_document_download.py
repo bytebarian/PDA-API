@@ -221,3 +221,57 @@ async def test_download_relative_path_is_resolved_from_storage_root(
     response = client.get(f"/documents/{doc.id}/download")
     assert response.status_code == 200
     assert response.content == b"root"
+
+
+async def test_download_storage_root_resolution_oserror_returns_404(
+    client: TestClient,
+    db_session: AsyncSession,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stored = tmp_path / "doc.pdf"
+    stored.write_bytes(b"ok")
+    doc = await _insert_document(
+        db_session,
+        filename="doc.pdf",
+        path=str(stored),
+    )
+
+    original_resolve = Path.resolve
+
+    def _raise_for_storage_root(self: Path, *, strict: bool = False) -> Path:
+        if strict and self == tmp_path:
+            raise PermissionError("denied")
+        return original_resolve(self, strict=strict)
+
+    monkeypatch.setattr(Path, "resolve", _raise_for_storage_root)
+
+    response = client.get(f"/documents/{doc.id}/download")
+    assert response.status_code == 404
+
+
+async def test_download_candidate_resolution_oserror_returns_404(
+    client: TestClient,
+    db_session: AsyncSession,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stored = tmp_path / "doc.pdf"
+    stored.write_bytes(b"ok")
+    doc = await _insert_document(
+        db_session,
+        filename="doc.pdf",
+        path=str(stored),
+    )
+
+    original_resolve = Path.resolve
+
+    def _raise_for_candidate(self: Path, *, strict: bool = False) -> Path:
+        if strict and self == stored:
+            raise PermissionError("denied")
+        return original_resolve(self, strict=strict)
+
+    monkeypatch.setattr(Path, "resolve", _raise_for_candidate)
+
+    response = client.get(f"/documents/{doc.id}/download")
+    assert response.status_code == 404

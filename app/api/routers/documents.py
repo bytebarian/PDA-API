@@ -4,6 +4,7 @@ Exposes:
   POST /documents/upload      – multipart file upload
   GET  /documents             – paginated document list
   GET  /documents/{id}        – document detail
+  GET  /documents/{id}/download – download original file
 """
 
 from __future__ import annotations
