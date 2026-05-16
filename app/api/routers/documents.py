@@ -4,23 +4,26 @@ Exposes:
   POST /documents/upload      – multipart file upload
   GET  /documents             – paginated document list
   GET  /documents/{id}        – document detail
+  DELETE /documents/{id}      – delete document and related state
   GET  /documents/{id}/download – download original file
 """
 
 from __future__ import annotations
 
+import logging
 import uuid
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.domain.status import DocumentStatus
+from app.models.document_chunk import DocumentChunk
 from app.models.document import Document
 from app.models.processing_job import ProcessingJob
 from app.schemas.document import (
@@ -36,6 +39,7 @@ from app.services.file_storage import resolve_stored_file_path, sanitize_filenam
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 UPLOAD_READ_CHUNK_SIZE = 1024 * 1024
+logger = logging.getLogger(__name__)
 
 
 def _escape_like_pattern(value: str) -> str:
@@ -217,6 +221,39 @@ async def get_document(
         updated_at=doc_row.updated_at,
         latest_job=latest_job,
     )
+
+
+@router.delete(
+    "/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete document",
+)
+async def delete_document(
+    document_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Delete a document, related rows, and its stored file when safely resolvable."""
+    document = await db.get(Document, document_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    resolved_path = resolve_stored_file_path(Path(settings.storage_path), document.path or "")
+
+    await db.execute(delete(ProcessingJob).where(ProcessingJob.document_id == document_id))
+    await db.execute(delete(DocumentChunk).where(DocumentChunk.document_id == document_id))
+    await db.execute(delete(Document).where(Document.id == document_id))
+    await db.commit()
+
+    if resolved_path is not None:
+        try:
+            resolved_path.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            logger.warning("Failed to delete stored file for document %s", document_id)
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
