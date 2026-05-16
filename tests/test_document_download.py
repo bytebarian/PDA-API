@@ -196,3 +196,28 @@ async def test_download_traversal_path_returns_404(
 
     response = client.get(f"/documents/{doc.id}/download")
     assert response.status_code == 404
+
+
+async def test_download_relative_path_is_resolved_from_storage_root(
+    client: TestClient,
+    db_session: AsyncSession,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root_file = tmp_path / "foo.pdf"
+    root_file.write_bytes(b"root")
+
+    subdir = tmp_path / "subdir"
+    subdir.mkdir()
+    (subdir / "foo.pdf").write_bytes(b"cwd")
+    monkeypatch.chdir(subdir)
+
+    doc = await _insert_document(
+        db_session,
+        filename="foo.pdf",
+        path="foo.pdf",
+    )
+
+    response = client.get(f"/documents/{doc.id}/download")
+    assert response.status_code == 200
+    assert response.content == b"root"
