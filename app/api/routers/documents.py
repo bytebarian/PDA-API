@@ -296,7 +296,7 @@ async def reprocess_document(
     )
 
     if payload is not None:
-        history_event: dict[str, str | bool | None] = {
+        history_event = {
             "stage": preferred_stage.value,
             "force": payload.force,
             "reason": payload.reason,
