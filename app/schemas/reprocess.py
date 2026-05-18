@@ -10,7 +10,11 @@ from app.domain.status import DocumentStatus, ProcessingJobStage, ProcessingJobS
 
 
 class ReprocessRequest(BaseModel):
-    """Optional request payload for reprocess endpoint."""
+    """Optional reprocess controls.
+
+    force indicates an explicit user-requested retry flag, and reason stores
+    an optional human-readable explanation for the reprocess request.
+    """
 
     force: bool = False
     reason: str | None = None

@@ -283,7 +283,13 @@ async def reprocess_document(
     payload: ReprocessRequest | None = Body(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> ReprocessResponse:
-    """Create a new processing job and reset document status to awaiting."""
+    """Create a reprocess job and reset only workflow state.
+
+    If no payload is provided, the endpoint records a plain reprocess request.
+    If payload is provided, it records force/reason in job stage history.
+    Storage-related fields (path, checksum, size, filename, metadata) are
+    preserved, while document status is reset to awaiting.
+    """
     document = await db.get(Document, document_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
