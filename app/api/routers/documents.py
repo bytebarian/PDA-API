@@ -288,11 +288,7 @@ async def reprocess_document(
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    preferred_stage = getattr(
-        ProcessingJobStage,
-        "queued",
-        ProcessingJobStage.upload_received,
-    )
+    preferred_stage = ProcessingJobStage.queued
     job = ProcessingJob(
         document_id=document.id,
         status=ProcessingJobStatus.awaiting.value,
@@ -311,9 +307,9 @@ async def reprocess_document(
     return ReprocessResponse(
         document_id=document.id,
         job_id=job.id,
-        document_status=document.status,  # type: ignore[arg-type]
-        job_status=job.status,  # type: ignore[arg-type]
-        job_stage=job.stage,  # type: ignore[arg-type]
+        document_status=DocumentStatus(document.status),
+        job_status=ProcessingJobStatus(job.status),
+        job_stage=ProcessingJobStage(job.stage),
     )
 
 
