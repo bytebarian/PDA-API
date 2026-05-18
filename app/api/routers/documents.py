@@ -280,7 +280,7 @@ async def update_document(
 )
 async def reprocess_document(
     document_id: uuid.UUID,
-    payload: ReprocessRequest | None = Body(default=None),
+    payload: ReprocessRequest | None = Body(None),
     db: AsyncSession = Depends(get_db),
 ) -> ReprocessResponse:
     """Create a reprocess job and reset only workflow state.
@@ -302,11 +302,12 @@ async def reprocess_document(
     )
 
     if payload is not None:
-        history_event = {
+        history_event: dict[str, str | bool] = {
             "stage": preferred_stage.value,
             "force": payload.force,
-            "reason": payload.reason,
         }
+        if payload.reason is not None:
+            history_event["reason"] = payload.reason
         job.stage_history_jsonb = [history_event]
 
     document.status = DocumentStatus.awaiting.value

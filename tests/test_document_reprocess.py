@@ -25,7 +25,7 @@ import app.models  # noqa: F401 – register all ORM models
 
 @pytest.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    """In-memory SQLite session with all tables created."""
+    """In-memory SQLite AsyncSession with all tables created."""
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
         echo=False,
