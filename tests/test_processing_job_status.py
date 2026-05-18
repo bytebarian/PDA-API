@@ -21,7 +21,7 @@ from app.main import app as fastapi_app
 from app.models.document import Document
 from app.models.processing_job import ProcessingJob
 
-import app.models  # noqa: F401 – register all ORM models
+import app.models  # noqa: F401 - register all ORM models
 
 
 @pytest.fixture
