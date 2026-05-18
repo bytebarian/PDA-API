@@ -37,20 +37,13 @@ class DocumentCreate(DocumentBase):
 class DocumentUpdate(BaseModel):
     """Schema for partially updating an existing document (all fields optional)."""
 
+    model_config = ConfigDict(extra="forbid")
+
     filename: str | None = None
     category: str | None = None
     file_type: str | None = None
-    mime_type: str | None = None
-    status: DocumentStatus | None = None
-    path: str | None = None
-    size: int | None = None
-    checksum_sha256: str | None = None
     metadata_jsonb: dict[str, Any] | None = None
-    extracted_text: str | None = None
     summary: str | None = None
-    chunk_count: int | None = None
-    embedding_model: str | None = None
-    last_indexed_at: datetime | None = None
 
 
 class DocumentRead(DocumentBase):

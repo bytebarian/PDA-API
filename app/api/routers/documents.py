@@ -4,6 +4,7 @@ Exposes:
   POST /documents/upload      – multipart file upload
   GET  /documents             – paginated document list
   GET  /documents/{id}        – document detail
+  PATCH /documents/{id}       – safe metadata updates
   DELETE /documents/{id}      – delete document and related state
   GET  /documents/{id}/download – download original file
 """
@@ -30,6 +31,7 @@ from app.schemas.document import (
     DocumentDetail,
     DocumentListResponse,
     DocumentSummary,
+    DocumentUpdate,
     ProcessingJobSummary,
 )
 from app.schemas.upload import UploadResponse
@@ -221,6 +223,45 @@ async def get_document(
         updated_at=doc_row.updated_at,
         latest_job=latest_job,
     )
+
+
+@router.patch(
+    "/{document_id}",
+    response_model=DocumentDetail,
+    summary="Update document metadata",
+)
+async def update_document(
+    document_id: uuid.UUID,
+    payload: DocumentUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> DocumentDetail:
+    """Apply a safe partial metadata update for a document."""
+    document = await db.get(Document, document_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    if "filename" in update_data:
+        filename = update_data["filename"]
+        if filename is None or not filename.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Filename must not be empty.",
+            )
+        safe_filename = sanitize_filename(filename)
+        if not safe_filename.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Filename must not be empty.",
+            )
+        update_data["filename"] = safe_filename
+
+    for field, value in update_data.items():
+        setattr(document, field, value)
+
+    await db.commit()
+    await db.refresh(document)
+    return await get_document(document.id, db)
 
 
 @router.delete(
