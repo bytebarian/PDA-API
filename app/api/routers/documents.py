@@ -4,6 +4,7 @@ Exposes:
   POST /documents/upload      – multipart file upload
   GET  /documents             – paginated document list
   GET  /documents/{id}        – document detail
+  POST /documents/{id}/reprocess – create a new processing job stub
   PATCH /documents/{id}       – safe metadata updates
   DELETE /documents/{id}      – delete document and related state
   GET  /documents/{id}/download – download original file
@@ -23,10 +24,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
-from app.domain.status import DocumentStatus
+from app.domain.status import DocumentStatus, ProcessingJobStage, ProcessingJobStatus
 from app.models.document_chunk import DocumentChunk
 from app.models.document import Document
 from app.models.processing_job import ProcessingJob
+from app.schemas.reprocess import ReprocessRequest, ReprocessResponse
 from app.schemas.document import (
     DocumentDetail,
     DocumentListResponse,
@@ -268,6 +270,51 @@ async def update_document(
 
     await db.commit()
     return await get_document(document.id, db)
+
+
+@router.post(
+    "/{document_id}/reprocess",
+    response_model=ReprocessResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Request document reprocessing",
+)
+async def reprocess_document(
+    document_id: uuid.UUID,
+    payload: ReprocessRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+) -> ReprocessResponse:
+    """Create a new processing job and reset document status to awaiting."""
+    document = await db.get(Document, document_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    preferred_stage = getattr(
+        ProcessingJobStage,
+        "queued",
+        ProcessingJobStage.upload_received,
+    )
+    job = ProcessingJob(
+        document_id=document.id,
+        status=ProcessingJobStatus.awaiting.value,
+        stage=preferred_stage.value,
+    )
+
+    if payload is not None and payload.reason is not None:
+        job.stage_history_jsonb = [{"stage": preferred_stage.value, "reason": payload.reason}]
+
+    document.status = DocumentStatus.awaiting.value
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
+    await db.refresh(document)
+
+    return ReprocessResponse(
+        document_id=document.id,
+        job_id=job.id,
+        document_status=document.status,  # type: ignore[arg-type]
+        job_status=job.status,  # type: ignore[arg-type]
+        job_stage=job.stage,  # type: ignore[arg-type]
+    )
 
 
 @router.delete(
