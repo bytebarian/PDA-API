@@ -53,6 +53,19 @@ def _escape_like_pattern(value: str) -> str:
     """
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
+
+def _sanitize_updated_filename(filename: str) -> str:
+    """Sanitize a user-provided filename and reject empty values."""
+    safe_filename = sanitize_filename(filename)
+    base_name = Path(filename).name.lstrip(".")
+    if not base_name.strip() or not safe_filename.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Filename must not be empty.",
+        )
+    return safe_filename
+
+
 async def read_upload_limited(file: UploadFile, max_bytes: int) -> bytes:
     chunks: list[bytes] = []
     total = 0
@@ -243,18 +256,12 @@ async def update_document(
     update_data = payload.model_dump(exclude_unset=True)
     if "filename" in update_data:
         filename = update_data["filename"]
-        if filename is None or not filename.strip():
+        if filename is None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="Filename must not be empty.",
             )
-        safe_filename = sanitize_filename(filename)
-        if not safe_filename.strip():
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail="Filename must not be empty.",
-            )
-        update_data["filename"] = safe_filename
+        update_data["filename"] = _sanitize_updated_filename(filename)
 
     for field, value in update_data.items():
         setattr(document, field, value)
