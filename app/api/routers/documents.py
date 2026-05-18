@@ -17,7 +17,7 @@ import uuid
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -280,7 +280,7 @@ async def update_document(
 )
 async def reprocess_document(
     document_id: uuid.UUID,
-    payload: ReprocessRequest | None = None,
+    payload: ReprocessRequest | None = Body(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> ReprocessResponse:
     """Create a new processing job and reset document status to awaiting."""
@@ -295,8 +295,13 @@ async def reprocess_document(
         stage=preferred_stage.value,
     )
 
-    if payload is not None and payload.reason is not None:
-        job.stage_history_jsonb = [{"stage": preferred_stage.value, "reason": payload.reason}]
+    if payload is not None:
+        history_event: dict[str, str | bool | None] = {
+            "stage": preferred_stage.value,
+            "force": payload.force,
+            "reason": payload.reason,
+        }
+        job.stage_history_jsonb = [history_event]
 
     document.status = DocumentStatus.awaiting.value
     db.add(job)

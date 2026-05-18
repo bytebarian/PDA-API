@@ -130,7 +130,9 @@ async def test_reprocess_creates_new_job_and_resets_document_status(
     assert new_job.document_id == document.id
     assert new_job.status == "awaiting"
     assert new_job.stage == "queued"
-    assert new_job.stage_history_jsonb == [{"stage": "queued", "reason": "manual retry"}]
+    assert new_job.stage_history_jsonb == [
+        {"stage": "queued", "force": True, "reason": "manual retry"}
+    ]
 
 
 def test_reprocess_missing_document_returns_404(client: TestClient) -> None:
