@@ -115,10 +115,10 @@ def test_document_base_rejects_invalid_status() -> None:
         DocumentBase(filename="f.pdf", status="unknown")  # type: ignore[arg-type]
 
 
-def test_document_update_rejects_invalid_status() -> None:
-    """DocumentUpdate must reject status values not in DocumentStatus."""
+def test_document_update_rejects_status_field() -> None:
+    """DocumentUpdate must reject status because it is not updatable metadata."""
     with pytest.raises(ValidationError):
-        DocumentUpdate(status="pending")  # type: ignore[arg-type]
+        DocumentUpdate(status="pending")  # type: ignore[call-arg]
 
 
 def test_processing_job_base_rejects_invalid_status() -> None:

@@ -96,16 +96,22 @@ def test_document_update_all_optional() -> None:
     """DocumentUpdate must allow instantiation with no fields."""
     update = DocumentUpdate()
     assert update.filename is None
-    assert update.status is None
-    assert update.size is None
+    assert update.category is None
+    assert update.summary is None
 
 
 def test_document_update_partial_payload() -> None:
     """DocumentUpdate accepts a subset of fields."""
-    update = DocumentUpdate(status="processing", chunk_count=3)  # type: ignore[arg-type]
-    assert update.status == "processing"
-    assert update.chunk_count == 3
+    update = DocumentUpdate(category="finance", metadata_jsonb={"source": "manual"})
+    assert update.category == "finance"
+    assert update.metadata_jsonb == {"source": "manual"}
     assert update.filename is None
+
+
+def test_document_update_rejects_disallowed_fields() -> None:
+    """DocumentUpdate must reject fields outside the safe update contract."""
+    with pytest.raises(ValidationError):
+        DocumentUpdate(status="processing")  # type: ignore[call-arg]
 
 
 # ---------------------------------------------------------------------------
