@@ -7,18 +7,20 @@ from collections.abc import Generator
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.main import create_app, get_settings
 
 
 @pytest.fixture
-def client() -> Generator[TestClient, None, None]:
+def client(monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, None, None]:
+    monkeypatch.delenv("PDA_API_PREFIX", raising=False)
+    get_settings.cache_clear()
+    app = create_app()
     with TestClient(app) as c:
         yield c
 
 
-def test_openapi_exposes_expected_gamma_routes() -> None:
-    with TestClient(app) as client:
-        response = client.get("/openapi.json")
+def test_openapi_exposes_expected_gamma_routes(client: TestClient) -> None:
+    response = client.get("/openapi.json")
     assert response.status_code == 200
 
     schema = response.json()
