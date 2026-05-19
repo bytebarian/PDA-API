@@ -102,6 +102,42 @@ async def test_process_job_success_replaces_prepopulated_legacy_stage_history(
     assert all("reason" not in entry for entry in processed.stage_history_jsonb)
 
 
+async def test_process_job_success_from_upload_received_stage(db_session: AsyncSession) -> None:
+    document = Document(filename="ingested.pdf", status="awaiting")
+    db_session.add(document)
+    await db_session.flush()
+
+    job = ProcessingJob(document_id=document.id, status="awaiting", stage="upload_received")
+    db_session.add(job)
+    await db_session.commit()
+
+    processed = await process_job(db_session, job.id)
+
+    assert processed.status == "ready"
+    assert processed.stage == "completed"
+    assert processed.attempt_count == 1
+
+    expected_flow = [
+        ("upload_received", "processing"),
+        ("upload_received", "completed"),
+        ("queued", "processing"),
+        ("queued", "completed"),
+        ("ocr", "processing"),
+        ("ocr", "completed"),
+        ("text_extraction", "processing"),
+        ("text_extraction", "completed"),
+        ("chunking", "processing"),
+        ("chunking", "completed"),
+        ("embedding", "processing"),
+        ("embedding", "completed"),
+        ("indexing", "processing"),
+        ("indexing", "completed"),
+        ("completed", "completed"),
+    ]
+    assert [(entry["stage"], entry["status"]) for entry in processed.stage_history_jsonb] == expected_flow
+    assert all("timestamp" in entry for entry in processed.stage_history_jsonb)
+
+
 async def test_process_job_missing_job_raises_not_found(db_session: AsyncSession) -> None:
     with pytest.raises(ProcessingJobNotFoundError):
         await process_job(db_session, uuid.uuid4())

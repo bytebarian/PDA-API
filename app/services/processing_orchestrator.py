@@ -119,6 +119,11 @@ async def _run_queued_stage(job: ProcessingJob) -> None:
     _append_stage_history(job, stage=ProcessingJobStage.queued, status="completed")
 
 
+async def _run_upload_received_stage(job: ProcessingJob) -> None:
+    _append_stage_history(job, stage=ProcessingJobStage.upload_received, status="processing")
+    _append_stage_history(job, stage=ProcessingJobStage.upload_received, status="completed")
+
+
 async def _run_ocr_stage(job: ProcessingJob) -> None:
     _append_stage_history(job, stage=ProcessingJobStage.ocr, status="processing")
     _append_stage_history(job, stage=ProcessingJobStage.ocr, status="completed")
@@ -144,8 +149,9 @@ async def _run_indexing_stage(job: ProcessingJob) -> None:
     _append_stage_history(job, stage=ProcessingJobStage.indexing, status="completed")
 
 
-def _stage_flow() -> tuple[tuple[ProcessingJobStage, Any], ...]:
-    return (
+def _stage_flow(start_stage: ProcessingJobStage) -> tuple[tuple[ProcessingJobStage, Any], ...]:
+    flow: tuple[tuple[ProcessingJobStage, Any], ...] = (
+        (ProcessingJobStage.upload_received, _run_upload_received_stage),
         (ProcessingJobStage.queued, _run_queued_stage),
         (ProcessingJobStage.ocr, _run_ocr_stage),
         (ProcessingJobStage.text_extraction, _run_text_extraction_stage),
@@ -153,6 +159,8 @@ def _stage_flow() -> tuple[tuple[ProcessingJobStage, Any], ...]:
         (ProcessingJobStage.embedding, _run_embedding_stage),
         (ProcessingJobStage.indexing, _run_indexing_stage),
     )
+    start_index = next(index for index, (stage, _) in enumerate(flow) if stage == start_stage)
+    return flow[start_index:]
 
 
 async def process_job(db: AsyncSession, job_id: uuid.UUID) -> ProcessingJob:
@@ -166,10 +174,11 @@ async def process_job(db: AsyncSession, job_id: uuid.UUID) -> ProcessingJob:
         raise ProcessingOrchestratorStateError("Document linked to processing job was not found")
 
     _validate_processable(document, job)
+    start_stage = ProcessingJobStage(job.stage)
     _mark_processing(document, job)
     await db.commit()
 
-    for stage, stage_runner in _stage_flow():
+    for stage, stage_runner in _stage_flow(start_stage):
         job.stage = stage.value
         try:
             await stage_runner(job)
