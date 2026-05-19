@@ -162,7 +162,7 @@ def _stage_flow(start_stage: ProcessingJobStage) -> tuple[tuple[ProcessingJobSta
     for index, (stage, _) in enumerate(flow):
         if stage == start_stage:
             return flow[index:]
-    raise ProcessingOrchestratorStateError(f"Unsupported initial stage: {start_stage.value}")
+    raise ProcessingOrchestratorStateError(f"Processing job is not in a queueable stage: {start_stage.value}")
 
 
 async def process_job(db: AsyncSession, job_id: uuid.UUID) -> ProcessingJob:
