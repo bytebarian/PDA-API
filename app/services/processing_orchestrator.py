@@ -73,6 +73,7 @@ def _mark_processing(document: Document, job: ProcessingJob) -> None:
     job.completed_at = None
     job.error_message = None
     job.error_details_jsonb = None
+    job.stage_history_jsonb = []
     job.attempt_count += 1
 
 
