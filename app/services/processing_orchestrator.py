@@ -159,8 +159,10 @@ def _stage_flow(start_stage: ProcessingJobStage) -> tuple[tuple[ProcessingJobSta
         (ProcessingJobStage.embedding, _run_embedding_stage),
         (ProcessingJobStage.indexing, _run_indexing_stage),
     )
-    start_index = next(index for index, (stage, _) in enumerate(flow) if stage == start_stage)
-    return flow[start_index:]
+    for index, (stage, _) in enumerate(flow):
+        if stage == start_stage:
+            return flow[index:]
+    raise ProcessingOrchestratorStateError(f"Unsupported initial stage: {start_stage.value}")
 
 
 async def process_job(db: AsyncSession, job_id: uuid.UUID) -> ProcessingJob:

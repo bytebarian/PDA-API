@@ -10,7 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.document import Document
 from app.models.processing_job import ProcessingJob
 from app.services import processing_orchestrator
-from app.services.processing_orchestrator import ProcessingJobNotFoundError, process_job
+from app.services.processing_orchestrator import (
+    ProcessingJobNotFoundError,
+    ProcessingOrchestratorStateError,
+    process_job,
+)
 
 
 async def test_process_job_success_updates_statuses_and_stage_history(db_session: AsyncSession) -> None:
@@ -141,6 +145,19 @@ async def test_process_job_success_from_upload_received_stage(db_session: AsyncS
 async def test_process_job_missing_job_raises_not_found(db_session: AsyncSession) -> None:
     with pytest.raises(ProcessingJobNotFoundError):
         await process_job(db_session, uuid.uuid4())
+
+
+async def test_process_job_invalid_initial_stage_raises_state_error(db_session: AsyncSession) -> None:
+    document = Document(filename="invalid-stage.pdf", status="awaiting")
+    db_session.add(document)
+    await db_session.flush()
+
+    job = ProcessingJob(document_id=document.id, status="awaiting", stage="unexpected")
+    db_session.add(job)
+    await db_session.commit()
+
+    with pytest.raises(ProcessingOrchestratorStateError, match="queueable stage"):
+        await process_job(db_session, job.id)
 
 
 async def test_process_job_failed_stage_marks_job_and_document_failed(
