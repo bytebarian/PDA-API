@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -192,7 +193,7 @@ async def list_documents(
 
 
 @router.get(
-    "/{document_id}",
+    "/{document_id:uuid}",
     response_model=DocumentDetail,
     summary="Get document detail",
 )
@@ -241,7 +242,7 @@ async def get_document(
 
 
 @router.patch(
-    "/{document_id}",
+    "/{document_id:uuid}",
     response_model=DocumentDetail,
     summary="Update document metadata",
 )
@@ -273,7 +274,7 @@ async def update_document(
 
 
 @router.post(
-    "/{document_id}/reprocess",
+    "/{document_id:uuid}/reprocess",
     response_model=ReprocessResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Request document reprocessing",
@@ -299,6 +300,7 @@ async def reprocess_document(
         document_id=document.id,
         status=ProcessingJobStatus.awaiting.value,
         stage=preferred_stage.value,
+        created_at=datetime.now(timezone.utc),
     )
 
     if payload is not None:
@@ -326,7 +328,7 @@ async def reprocess_document(
 
 
 @router.delete(
-    "/{document_id}",
+    "/{document_id:uuid}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete document",
 )
@@ -359,7 +361,7 @@ async def delete_document(
 
 
 @router.get(
-    "/{document_id}/download",
+    "/{document_id:uuid}/download",
     summary="Download original document file",
 )
 async def download_document(

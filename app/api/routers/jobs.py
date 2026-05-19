@@ -13,7 +13,7 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 @router.get(
-    "/{job_id}",
+    "/{job_id:uuid}",
     response_model=ProcessingJobRead,
     summary="Get processing job status",
 )
