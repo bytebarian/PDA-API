@@ -270,6 +270,7 @@ async def update_document(
         setattr(document, field, value)
 
     await db.commit()
+    await db.refresh(document)
     return await get_document(document.id, db)
 
 
