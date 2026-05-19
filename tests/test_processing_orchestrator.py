@@ -53,6 +53,55 @@ async def test_process_job_success_updates_statuses_and_stage_history(db_session
     assert all("timestamp" in entry for entry in processed.stage_history_jsonb)
 
 
+async def test_process_job_success_replaces_prepopulated_legacy_stage_history(
+    db_session: AsyncSession,
+) -> None:
+    document = Document(filename="reprocess.pdf", status="awaiting")
+    db_session.add(document)
+    await db_session.flush()
+
+    job = ProcessingJob(
+        document_id=document.id,
+        status="awaiting",
+        stage="queued",
+        stage_history_jsonb=[{"stage": "queued", "force": True, "reason": "reprocess"}],
+    )
+    db_session.add(job)
+    await db_session.commit()
+
+    processed = await process_job(db_session, job.id)
+
+    refreshed_document = await db_session.get(Document, document.id)
+    assert refreshed_document is not None
+
+    assert processed.status == "ready"
+    assert processed.stage == "completed"
+    assert processed.attempt_count == 1
+    assert processed.started_at is not None
+    assert processed.completed_at is not None
+    assert refreshed_document.status == "ready"
+
+    expected_flow = [
+        ("queued", "processing"),
+        ("queued", "completed"),
+        ("ocr", "processing"),
+        ("ocr", "completed"),
+        ("text_extraction", "processing"),
+        ("text_extraction", "completed"),
+        ("chunking", "processing"),
+        ("chunking", "completed"),
+        ("embedding", "processing"),
+        ("embedding", "completed"),
+        ("indexing", "processing"),
+        ("indexing", "completed"),
+        ("completed", "completed"),
+    ]
+    assert [(entry["stage"], entry["status"]) for entry in processed.stage_history_jsonb] == expected_flow
+    assert all("timestamp" in entry for entry in processed.stage_history_jsonb)
+    assert all("force" not in entry for entry in processed.stage_history_jsonb)
+    assert all("reason" not in entry for entry in processed.stage_history_jsonb)
+
+
 async def test_process_job_missing_job_raises_not_found(db_session: AsyncSession) -> None:
     with pytest.raises(ProcessingJobNotFoundError):
         await process_job(db_session, uuid.uuid4())
