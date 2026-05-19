@@ -301,7 +301,6 @@ async def reprocess_document(
         document_id=document.id,
         status=ProcessingJobStatus.awaiting.value,
         stage=preferred_stage.value,
-        created_at=datetime.now(timezone.utc),
     )
 
     if payload is not None:
