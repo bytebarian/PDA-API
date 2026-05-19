@@ -166,11 +166,13 @@ async def process_job(db: AsyncSession, job_id: uuid.UUID) -> ProcessingJob:
 
     _validate_processable(document, job)
     _mark_processing(document, job)
+    await db.commit()
 
     for stage, stage_runner in _stage_flow():
         job.stage = stage.value
         try:
             await stage_runner(job)
+            await db.commit()
         except Exception as error:
             _mark_failed(document, job, failed_stage=stage, error=error)
             await db.commit()
