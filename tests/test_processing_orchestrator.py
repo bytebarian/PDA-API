@@ -202,3 +202,35 @@ async def test_process_job_failed_stage_marks_job_and_document_failed(
 
     assert refreshed_job.stage_history_jsonb[-1]["stage"] == "chunking"
     assert refreshed_job.stage_history_jsonb[-1]["status"] == "failed"
+
+async def test_process_job_rejects_exhausted_retry_attempts(
+    db_session: AsyncSession,
+) -> None:
+    document = Document(filename="exhausted.pdf", status="awaiting")
+    db_session.add(document)
+    await db_session.flush()
+
+    job = ProcessingJob(
+        document_id=document.id,
+        status="awaiting",
+        stage="queued",
+        attempt_count=3,
+        max_attempts=3,
+    )
+    db_session.add(job)
+    await db_session.commit()
+
+    with pytest.raises(
+        ProcessingOrchestratorStateError,
+        match="exhausted retry attempts",
+    ):
+        await process_job(db_session, job.id)
+
+    refreshed_job = await db_session.get(ProcessingJob, job.id)
+    refreshed_document = await db_session.get(Document, document.id)
+
+    assert refreshed_job is not None
+    assert refreshed_document is not None
+    assert refreshed_job.attempt_count == 3
+    assert refreshed_job.status == "awaiting"
+    assert refreshed_document.status == "awaiting"

@@ -65,6 +65,9 @@ def _validate_processable(document: Document, job: ProcessingJob) -> None:
     }:
         raise ProcessingOrchestratorStateError("Document is not awaiting processing")
 
+    if job.attempt_count >= job.max_attempts:
+        raise ProcessingOrchestratorStateError(f"Processing job has exhausted retry attempts: {job.attempt_count}/{job.max_attempts}")
+
 
 def _mark_processing(document: Document, job: ProcessingJob) -> None:
     job.status = ProcessingJobStatus.processing.value
