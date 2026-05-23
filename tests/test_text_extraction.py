@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from app.services.text_extraction import (
@@ -35,8 +37,8 @@ def test_markdown_adapter_satisfies_protocol() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_plain_text_extract_returns_result(tmp_path: pytest.TempPathFactory) -> None:
-    f = tmp_path / "hello.txt"  # type: ignore[operator]
+async def test_plain_text_extract_returns_result(tmp_path: Path) -> None:
+    f = tmp_path / "hello.txt"
     f.write_text("Hello, world!", encoding="utf-8")
 
     result = await PlainTextAdapter().extract(f)
@@ -45,8 +47,8 @@ async def test_plain_text_extract_returns_result(tmp_path: pytest.TempPathFactor
     assert result.text == "Hello, world!"
 
 
-async def test_plain_text_extract_normalises_crlf(tmp_path: pytest.TempPathFactory) -> None:
-    f = tmp_path / "crlf.txt"  # type: ignore[operator]
+async def test_plain_text_extract_normalises_crlf(tmp_path: Path) -> None:
+    f = tmp_path / "crlf.txt"
     f.write_bytes(b"line1\r\nline2\r\n")
 
     result = await PlainTextAdapter().extract(f)
@@ -54,8 +56,8 @@ async def test_plain_text_extract_normalises_crlf(tmp_path: pytest.TempPathFacto
     assert result.text == "line1\nline2\n"
 
 
-async def test_plain_text_extract_metadata_keys(tmp_path: pytest.TempPathFactory) -> None:
-    f = tmp_path / "doc.txt"  # type: ignore[operator]
+async def test_plain_text_extract_metadata_keys(tmp_path: Path) -> None:
+    f = tmp_path / "doc.txt"
     content = "some text"
     f.write_text(content, encoding="utf-8")
 
@@ -68,14 +70,14 @@ async def test_plain_text_extract_metadata_keys(tmp_path: pytest.TempPathFactory
     assert result.metadata["char_count"] == len(content)
 
 
-async def test_plain_text_extract_missing_file_raises(tmp_path: pytest.TempPathFactory) -> None:
-    missing = tmp_path / "nope.txt"  # type: ignore[operator]
+async def test_plain_text_extract_missing_file_raises(tmp_path: Path) -> None:
+    missing = tmp_path / "nope.txt"
     with pytest.raises(TextExtractionFileNotFoundError, match="nope.txt"):
         await PlainTextAdapter().extract(missing)
 
 
-async def test_plain_text_extract_decode_error_raises(tmp_path: pytest.TempPathFactory) -> None:
-    f = tmp_path / "bad.txt"  # type: ignore[operator]
+async def test_plain_text_extract_decode_error_raises(tmp_path: Path) -> None:
+    f = tmp_path / "bad.txt"
     f.write_bytes(b"\xff\xfe invalid utf-8 \x80\x81")
 
     with pytest.raises(TextExtractionDecodeError):
@@ -87,8 +89,8 @@ async def test_plain_text_extract_decode_error_raises(tmp_path: pytest.TempPathF
 # ---------------------------------------------------------------------------
 
 
-async def test_markdown_extract_returns_result(tmp_path: pytest.TempPathFactory) -> None:
-    f = tmp_path / "readme.md"  # type: ignore[operator]
+async def test_markdown_extract_returns_result(tmp_path: Path) -> None:
+    f = tmp_path / "readme.md"
     f.write_text("# Title\n\nSome text.", encoding="utf-8")
 
     result = await MarkdownAdapter().extract(f)
@@ -97,8 +99,8 @@ async def test_markdown_extract_returns_result(tmp_path: pytest.TempPathFactory)
     assert "# Title" in result.text
 
 
-async def test_markdown_extract_metadata_keys(tmp_path: pytest.TempPathFactory) -> None:
-    f = tmp_path / "notes.md"  # type: ignore[operator]
+async def test_markdown_extract_metadata_keys(tmp_path: Path) -> None:
+    f = tmp_path / "notes.md"
     content = "## Notes\n\nDetails here."
     f.write_text(content, encoding="utf-8")
 
@@ -111,8 +113,8 @@ async def test_markdown_extract_metadata_keys(tmp_path: pytest.TempPathFactory) 
     assert result.metadata["char_count"] == len(content)
 
 
-async def test_markdown_extract_dot_markdown_extension(tmp_path: pytest.TempPathFactory) -> None:
-    f = tmp_path / "doc.markdown"  # type: ignore[operator]
+async def test_markdown_extract_dot_markdown_extension(tmp_path: Path) -> None:
+    f = tmp_path / "doc.markdown"
     f.write_text("content", encoding="utf-8")
 
     result = await MarkdownAdapter().extract(f)
@@ -120,14 +122,14 @@ async def test_markdown_extract_dot_markdown_extension(tmp_path: pytest.TempPath
     assert result.metadata["source_extension"] == ".markdown"
 
 
-async def test_markdown_extract_missing_file_raises(tmp_path: pytest.TempPathFactory) -> None:
-    missing = tmp_path / "missing.md"  # type: ignore[operator]
+async def test_markdown_extract_missing_file_raises(tmp_path: Path) -> None:
+    missing = tmp_path / "missing.md"
     with pytest.raises(TextExtractionFileNotFoundError, match="missing.md"):
         await MarkdownAdapter().extract(missing)
 
 
-async def test_markdown_extract_decode_error_raises(tmp_path: pytest.TempPathFactory) -> None:
-    f = tmp_path / "bad.md"  # type: ignore[operator]
+async def test_markdown_extract_decode_error_raises(tmp_path: Path) -> None:
+    f = tmp_path / "bad.md"
     f.write_bytes(b"\xff\xfe bad encoding \x80")
 
     with pytest.raises(TextExtractionDecodeError):
@@ -200,8 +202,8 @@ def test_resolver_no_hints_raises() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_extract_text_from_file_plain_text(tmp_path: pytest.TempPathFactory) -> None:
-    f = tmp_path / "test.txt"  # type: ignore[operator]
+async def test_extract_text_from_file_plain_text(tmp_path: Path) -> None:
+    f = tmp_path / "test.txt"
     f.write_text("plain content", encoding="utf-8")
 
     result = await extract_text_from_file(f, mime_type="text/plain")
@@ -211,9 +213,9 @@ async def test_extract_text_from_file_plain_text(tmp_path: pytest.TempPathFactor
 
 
 async def test_extract_text_from_file_infers_adapter_from_path(
-    tmp_path: pytest.TempPathFactory,
+    tmp_path: Path,
 ) -> None:
-    f = tmp_path / "readme.md"  # type: ignore[operator]
+    f = tmp_path / "readme.md"
     f.write_text("# Hello", encoding="utf-8")
 
     # No mime_type supplied – resolver should use the path's extension.
@@ -224,10 +226,10 @@ async def test_extract_text_from_file_infers_adapter_from_path(
 
 
 async def test_extract_text_from_file_filename_hint_overrides_path_extension(
-    tmp_path: pytest.TempPathFactory,
+    tmp_path: Path,
 ) -> None:
     # File on disk has no extension; hint says it's a .txt file.
-    f = tmp_path / "datafile"  # type: ignore[operator]
+    f = tmp_path / "datafile"
     f.write_text("raw data", encoding="utf-8")
 
     result = await extract_text_from_file(f, filename="datafile.txt")
@@ -236,16 +238,16 @@ async def test_extract_text_from_file_filename_hint_overrides_path_extension(
     assert result.metadata["extractor"] == "PlainTextAdapter"
 
 
-async def test_extract_text_from_file_missing_raises(tmp_path: pytest.TempPathFactory) -> None:
-    missing = tmp_path / "ghost.txt"  # type: ignore[operator]
+async def test_extract_text_from_file_missing_raises(tmp_path: Path) -> None:
+    missing = tmp_path / "ghost.txt"
     with pytest.raises(TextExtractionFileNotFoundError):
         await extract_text_from_file(missing)
 
 
 async def test_extract_text_from_file_unsupported_type_raises(
-    tmp_path: pytest.TempPathFactory,
+    tmp_path: Path,
 ) -> None:
-    f = tmp_path / "archive.zip"  # type: ignore[operator]
+    f = tmp_path / "archive.zip"
     f.write_bytes(b"PK\x03\x04")
 
     with pytest.raises(UnsupportedTextExtractionTypeError):
@@ -253,12 +255,12 @@ async def test_extract_text_from_file_unsupported_type_raises(
 
 
 async def test_extract_text_from_file_passes_document_to_adapter(
-    tmp_path: pytest.TempPathFactory,
+    tmp_path: Path,
 ) -> None:
     """Verify that Document is forwarded without causing errors."""
     from app.models.document import Document
 
-    f = tmp_path / "with_doc.txt"  # type: ignore[operator]
+    f = tmp_path / "with_doc.txt"
     f.write_text("content", encoding="utf-8")
 
     doc = Document(filename="with_doc.txt")
