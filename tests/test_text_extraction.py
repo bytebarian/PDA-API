@@ -103,13 +103,14 @@ async def test_markdown_extract_metadata_keys(tmp_path: Path) -> None:
     f = tmp_path / "notes.md"
     content = "## Notes\n\nDetails here."
     f.write_text(content, encoding="utf-8")
+    raw = f.read_bytes()
 
     result = await MarkdownAdapter().extract(f)
 
     assert result.metadata["extractor"] == "MarkdownAdapter"
     assert result.metadata["source_extension"] == ".md"
     assert result.metadata["mime_type"] == "text/markdown"
-    assert result.metadata["byte_size"] == len(content.encode("utf-8"))
+    assert result.metadata["byte_size"] == len(raw)
     assert result.metadata["char_count"] == len(content)
 
 

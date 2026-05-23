@@ -209,11 +209,12 @@ async def get_document(
     doc_row = await db.get(Document, document_id)
     if doc_row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    await db.refresh(doc_row)
 
     job_stmt = (
         select(ProcessingJob)
         .where(ProcessingJob.document_id == document_id)
-        .order_by(ProcessingJob.created_at.desc(), ProcessingJob.id.desc())
+        .order_by(ProcessingJob.created_at.desc())
         .limit(1)
     )
     job_row = (await db.execute(job_stmt)).scalars().first()
@@ -296,10 +297,13 @@ async def reprocess_document(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
     preferred_stage = ProcessingJobStage.queued
+    now = datetime.now(timezone.utc)
     job = ProcessingJob(
         document_id=document.id,
         status=ProcessingJobStatus.awaiting.value,
         stage=preferred_stage.value,
+        created_at=now,
+        updated_at=now,
     )
 
     if payload is not None:

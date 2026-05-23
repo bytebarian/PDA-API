@@ -6,6 +6,7 @@ the corresponding ``Document`` and ``ProcessingJob`` database rows.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import HTTPException, status
@@ -90,10 +91,13 @@ async def ingest_upload(
     await db.flush()  # Populate document.id before creating the job.
 
     # --- Create ProcessingJob row ----------------------------------------------
+    now = datetime.now(timezone.utc)
     job = ProcessingJob(
         document_id=document.id,
         status=ProcessingJobStatus.awaiting.value,
         stage=ProcessingJobStage.upload_received.value,
+        created_at=now,
+        updated_at=now,
     )
     db.add(job)
     await db.commit()
