@@ -115,11 +115,15 @@ def _find_best_boundary(text: str, start: int, target_end: int) -> int:
         return search_start + idx + 1
 
     # 3. Sentence boundary
+    best_idx = -1
+    best_marker_len = 0
     for marker in (". ", "! ", "? "):
         idx = segment.rfind(marker)
-        if idx >= 0:
-            return search_start + idx + len(marker)
-
+        if idx >= 0 and idx > best_idx:
+            best_idx = idx
+            best_marker_len = len(marker)
+    if best_idx >= 0:
+        return search_start + best_idx + best_marker_len
     # 4. Whitespace boundary
     idx = segment.rfind(" ")
     if idx >= 0:
