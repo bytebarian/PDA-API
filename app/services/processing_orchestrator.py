@@ -145,22 +145,25 @@ async def _run_ocr_stage(
 async def _run_text_extraction_stage(
     db: AsyncSession, document: Document, job: ProcessingJob
 ) -> None:
-    from pathlib import Path
-
+    from app.core.config import get_settings
+    from app.services.file_storage import resolve_stored_file_path
     from app.services.text_extraction import extract_text_from_file
 
     _append_stage_history(job, stage=ProcessingJobStage.text_extraction, status="processing")
 
     needs_extraction = document.extracted_text is None or not document.extracted_text.strip()
     if needs_extraction:
-        if document.path is not None and document.path.strip():
-            result = await extract_text_from_file(
-                Path(document.path),
-                mime_type=document.mime_type,
-                filename=document.filename,
-                document=document,
-            )
-            document.extracted_text = result.text
+        stored_path = document.path or ""
+        resolved_path = resolve_stored_file_path(get_settings().storage_path, stored_path)
+        if resolved_path is None:
+            raise FileNotFoundError("Document file path is missing or outside storage root")
+        result = await extract_text_from_file(
+            resolved_path,
+            mime_type=document.mime_type,
+            filename=document.filename,
+            document=document,
+        )
+        document.extracted_text = result.text
 
     _append_stage_history(
         job,

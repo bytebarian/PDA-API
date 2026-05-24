@@ -8,7 +8,7 @@ configuration, runs the algorithm, and persists results into the
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from sqlalchemy import delete, select
@@ -83,6 +83,23 @@ _BOUNDARY_WINDOW = 200
 
 def _normalize_line_endings(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _normalized_to_source_offset_map(source_text: str) -> list[int]:
+    """Map normalized offsets (LF-normalized) back to source-text offsets."""
+    offsets = [0]
+    index = 0
+    while index < len(source_text):
+        if source_text[index] == "\r":
+            if index + 1 < len(source_text) and source_text[index + 1] == "\n":
+                index += 2
+            else:
+                index += 1
+            offsets.append(index)
+            continue
+        index += 1
+        offsets.append(index)
+    return offsets
 
 
 def _find_best_boundary(text: str, start: int, target_end: int) -> int:
@@ -273,5 +290,17 @@ async def chunk_document(
     if not chunks:
         raise ChunkingEmptyTextError("No extractable text available for chunking")
 
-    await replace_document_chunks(db, document, chunks)
-    return chunks
+    normalized_text = _normalize_line_endings(raw_text)
+    left_trimmed_count = len(normalized_text) - len(normalized_text.lstrip())
+    normalized_offset_map = _normalized_to_source_offset_map(raw_text)
+    source_relative_chunks = [
+        replace(
+            chunk,
+            start_offset=normalized_offset_map[left_trimmed_count + chunk.start_offset],
+            end_offset=normalized_offset_map[left_trimmed_count + chunk.end_offset],
+        )
+        for chunk in chunks
+    ]
+
+    await replace_document_chunks(db, document, source_relative_chunks)
+    return source_relative_chunks

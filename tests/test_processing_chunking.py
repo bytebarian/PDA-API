@@ -362,3 +362,35 @@ async def test_chunk_offsets_reconstruct_content(db_session: AsyncSession) -> No
         assert chunk.source_end_offset is not None
         sliced = normalized[chunk.source_start_offset : chunk.source_end_offset].strip()
         assert sliced == chunk.content
+
+
+async def test_chunk_offsets_preserve_source_positions_with_crlf_and_padding(
+    db_session: AsyncSession,
+) -> None:
+    """Persisted offsets should resolve against the original extracted_text."""
+    raw_text = "  \r\nFirst sentence.\r\nSecond sentence.\r\n  "
+    document = Document(
+        filename="offsets_crlf.txt",
+        status="awaiting",
+        extracted_text=raw_text,
+    )
+    db_session.add(document)
+    await db_session.flush()
+
+    job = ProcessingJob(document_id=document.id, status="awaiting", stage="queued")
+    db_session.add(job)
+    await db_session.commit()
+
+    await process_job(db_session, job.id)
+
+    chunks = await _load_chunks(db_session, document)
+    assert chunks
+    first_chunk_start = chunks[0].source_start_offset
+    assert first_chunk_start is not None
+    assert first_chunk_start > 0
+
+    for chunk in chunks:
+        assert chunk.source_start_offset is not None
+        assert chunk.source_end_offset is not None
+        sliced = raw_text[chunk.source_start_offset : chunk.source_end_offset]
+        assert sliced.replace("\r\n", "\n").replace("\r", "\n").strip() == chunk.content
