@@ -267,13 +267,12 @@ async def chunk_document(
         ChunkingValidationError: When the persisted settings are invalid.
     """
     raw_text = document.extracted_text or ""
-    normalized = _normalize_line_endings(raw_text).strip()
-    if not normalized:
-        raise ChunkingEmptyTextError("No extractable text available for chunking")
 
     chunk_size, chunk_overlap = await _load_chunk_settings(db)
-    validate_chunk_settings(chunk_size, chunk_overlap)
+    chunks = chunk_text(raw_text, chunk_size, chunk_overlap)
+    if not chunks:
+        raise ChunkingEmptyTextError("No extractable text available for chunking")
 
-    chunks = chunk_text(normalized, chunk_size, chunk_overlap)
     await replace_document_chunks(db, document, chunks)
+    return chunks
     return chunks
