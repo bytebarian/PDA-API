@@ -17,14 +17,15 @@ class ChunkingConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_relationship(self) -> ChunkingConfig:
-        if self.chunk_size <= 0:
-            raise ValueError(f"chunkSize must be > 0, got {self.chunk_size}")
-        if self.chunk_overlap < 0:
-            raise ValueError(f"chunkOverlap must be >= 0, got {self.chunk_overlap}")
-        if self.chunk_overlap >= self.chunk_size:
-            raise ValueError(
-                f"chunkOverlap ({self.chunk_overlap}) must be < chunkSize ({self.chunk_size})"
-            )
+        from app.services.chunking_service import (
+            ChunkingValidationError,
+            validate_chunk_settings,
+        )
+
+        try:
+            validate_chunk_settings(self.chunk_size, self.chunk_overlap)
+        except ChunkingValidationError as exc:
+            raise ValueError(str(exc)) from exc
         return self
 
 
