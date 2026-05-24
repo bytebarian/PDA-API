@@ -212,23 +212,27 @@ def test_chunk_text_splits_on_paragraph_boundary() -> None:
 
 
 def test_chunk_text_splits_on_sentence_boundary() -> None:
-    """Sentence terminators ('. ') should be preferred over mid-word hard splits."""
+    """Sentence terminators ('. ', '! ', '? ') should be preferred over mid-word hard splits."""
     text = "First sentence. " + "Second sentence. " + "Third sentence. " * 5
-    result = chunk_text(text, 40, 0)
-def test_chunk_text_no_whitespace_text_hard_splits() -> None:
-    """Text with no whitespace is hard-split at chunk_size."""
     normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+    result = chunk_text(text, 40, 0)
+
     sentence_markers = (". ", "! ", "? ")
-    text = "A" * 250
-    # Every non-final chunk should end at a sentence boundary (marker includes trailing space).
     for chunk in result[:-1]:
         assert normalized[chunk.end_offset - 2 : chunk.end_offset] in sentence_markers
 
 
+def test_chunk_text_no_whitespace_text_hard_splits() -> None:
+    """Text with no whitespace is hard-split at chunk_size."""
+    text = "A" * 250
     result = chunk_text(text, 100, 0)
     assert len(result) == 3  # 100, 100, 50
-    for chunk in result:
-        assert len(chunk.content) <= 100
+
+    for i, chunk in enumerate(result):
+        assert chunk.chunk_index == i
+        assert chunk.start_offset == i * 100
+        assert chunk.end_offset == min((i + 1) * 100, 250)
+        assert chunk.content == "A" * (chunk.end_offset - chunk.start_offset)
 
 
 # ---------------------------------------------------------------------------
