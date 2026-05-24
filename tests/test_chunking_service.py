@@ -215,17 +215,16 @@ def test_chunk_text_splits_on_sentence_boundary() -> None:
     """Sentence terminators ('. ') should be preferred over mid-word hard splits."""
     text = "First sentence. " + "Second sentence. " + "Third sentence. " * 5
     result = chunk_text(text, 40, 0)
-
-    assert len(result) > 0
-    # For this input, a sentence boundary ('. ') is always available near each chunk end,
-    # so every non-final chunk should end with a sentence terminator.
-    for chunk in result[:-1]:
-        assert chunk.content.endswith((".", "!", "?"))
-
-
 def test_chunk_text_no_whitespace_text_hard_splits() -> None:
     """Text with no whitespace is hard-split at chunk_size."""
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+    sentence_markers = (". ", "! ", "? ")
     text = "A" * 250
+    # Every non-final chunk should end at a sentence boundary (marker includes trailing space).
+    for chunk in result[:-1]:
+        assert normalized[chunk.end_offset - 2 : chunk.end_offset] in sentence_markers
+
+
     result = chunk_text(text, 100, 0)
     assert len(result) == 3  # 100, 100, 50
     for chunk in result:
