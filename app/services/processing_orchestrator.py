@@ -1,8 +1,9 @@
-"""Processing orchestration skeleton for document jobs."""
+"""Processing orchestration for document jobs."""
 
 from __future__ import annotations
 
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 from typing import Any
 
@@ -11,6 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.status import DocumentStatus, ProcessingJobStage, ProcessingJobStatus
 from app.models.document import Document
 from app.models.processing_job import ProcessingJob
+
+# Type alias for stage runner callables.
+_StageRunner = Callable[[AsyncSession, Document, ProcessingJob], Awaitable[None]]
 
 
 class ProcessingJobNotFoundError(LookupError):
@@ -117,43 +121,93 @@ def _mark_failed(
     )
 
 
-async def _run_queued_stage(job: ProcessingJob) -> None:
+async def _run_queued_stage(
+    db: AsyncSession, document: Document, job: ProcessingJob
+) -> None:
     _append_stage_history(job, stage=ProcessingJobStage.queued, status="processing")
     _append_stage_history(job, stage=ProcessingJobStage.queued, status="completed")
 
 
-async def _run_upload_received_stage(job: ProcessingJob) -> None:
+async def _run_upload_received_stage(
+    db: AsyncSession, document: Document, job: ProcessingJob
+) -> None:
     _append_stage_history(job, stage=ProcessingJobStage.upload_received, status="processing")
     _append_stage_history(job, stage=ProcessingJobStage.upload_received, status="completed")
 
 
-async def _run_ocr_stage(job: ProcessingJob) -> None:
+async def _run_ocr_stage(
+    db: AsyncSession, document: Document, job: ProcessingJob
+) -> None:
     _append_stage_history(job, stage=ProcessingJobStage.ocr, status="processing")
     _append_stage_history(job, stage=ProcessingJobStage.ocr, status="completed")
 
 
-async def _run_text_extraction_stage(job: ProcessingJob) -> None:
+async def _run_text_extraction_stage(
+    db: AsyncSession, document: Document, job: ProcessingJob
+) -> None:
+    from app.core.config import get_settings
+    from app.services.file_storage import resolve_stored_file_path
+    from app.services.text_extraction import extract_text_from_file
+
     _append_stage_history(job, stage=ProcessingJobStage.text_extraction, status="processing")
-    _append_stage_history(job, stage=ProcessingJobStage.text_extraction, status="completed")
+
+    needs_extraction = document.extracted_text is None or not document.extracted_text.strip()
+    if needs_extraction:
+        stored_path = document.path or ""
+        resolved_path = resolve_stored_file_path(get_settings().storage_path, stored_path)
+        if resolved_path is None:
+            raise FileNotFoundError(
+                f"Document file path is missing or outside storage root for document {document.id}"
+            )
+        result = await extract_text_from_file(
+            resolved_path,
+            mime_type=document.mime_type,
+            filename=document.filename,
+            document=document,
+        )
+        document.extracted_text = result.text
+
+    _append_stage_history(
+        job,
+        stage=ProcessingJobStage.text_extraction,
+        status="completed",
+        details={"char_count": len((document.extracted_text or "").strip())},
+    )
 
 
-async def _run_chunking_stage(job: ProcessingJob) -> None:
+async def _run_chunking_stage(
+    db: AsyncSession, document: Document, job: ProcessingJob
+) -> None:
+    from app.services.chunking_service import chunk_document
+
     _append_stage_history(job, stage=ProcessingJobStage.chunking, status="processing")
-    _append_stage_history(job, stage=ProcessingJobStage.chunking, status="completed")
+
+    chunks = await chunk_document(db, document)
+
+    _append_stage_history(
+        job,
+        stage=ProcessingJobStage.chunking,
+        status="completed",
+        details={"chunk_count": len(chunks)},
+    )
 
 
-async def _run_embedding_stage(job: ProcessingJob) -> None:
+async def _run_embedding_stage(
+    db: AsyncSession, document: Document, job: ProcessingJob
+) -> None:
     _append_stage_history(job, stage=ProcessingJobStage.embedding, status="processing")
     _append_stage_history(job, stage=ProcessingJobStage.embedding, status="completed")
 
 
-async def _run_indexing_stage(job: ProcessingJob) -> None:
+async def _run_indexing_stage(
+    db: AsyncSession, document: Document, job: ProcessingJob
+) -> None:
     _append_stage_history(job, stage=ProcessingJobStage.indexing, status="processing")
     _append_stage_history(job, stage=ProcessingJobStage.indexing, status="completed")
 
 
-def _stage_flow(start_stage: ProcessingJobStage) -> tuple[tuple[ProcessingJobStage, Any], ...]:
-    flow: tuple[tuple[ProcessingJobStage, Any], ...] = (
+def _stage_flow(start_stage: ProcessingJobStage) -> tuple[tuple[ProcessingJobStage, _StageRunner], ...]:
+    flow: tuple[tuple[ProcessingJobStage, _StageRunner], ...] = (
         (ProcessingJobStage.upload_received, _run_upload_received_stage),
         (ProcessingJobStage.queued, _run_queued_stage),
         (ProcessingJobStage.ocr, _run_ocr_stage),
@@ -186,7 +240,7 @@ async def process_job(db: AsyncSession, job_id: uuid.UUID) -> ProcessingJob:
     for stage, stage_runner in _stage_flow(start_stage):
         job.stage = stage.value
         try:
-            await stage_runner(job)
+            await stage_runner(db, document, job)
             await db.commit()
         except Exception as error:
             _mark_failed(document, job, failed_stage=stage, error=error)
