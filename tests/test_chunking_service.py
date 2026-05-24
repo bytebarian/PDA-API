@@ -206,7 +206,7 @@ def test_chunk_text_splits_on_paragraph_boundary() -> None:
     text = para1 + "\n\n" + para2
     result = chunk_text(text, 100, 0)
     # The split should happen at the paragraph boundary (after para1).
-    assert any("\n\n" not in chunk.content for chunk in result)
+    assert all("\n\n" not in chunk.content for chunk in result)
     # First chunk should not contain para2 content.
     assert "B" not in result[0].content
 
