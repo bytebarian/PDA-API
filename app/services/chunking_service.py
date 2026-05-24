@@ -187,7 +187,7 @@ def chunk_text(text: str, chunk_size: int, chunk_overlap: int) -> list[ChunkResu
 
 
 async def _load_chunk_settings(db: AsyncSession) -> tuple[int, int]:
-    """Return ``(chunk_size, chunk_overlap)`` from the first AppSettings row.
+    """Return ``(chunk_size, chunk_overlap)`` from the most recently updated AppSettings row.
 
     Falls back to module-level defaults when no row exists.
     """
