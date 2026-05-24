@@ -271,6 +271,10 @@ async def chunk_document(
     if not normalized:
         raise ChunkingEmptyTextError("No extractable text available for chunking")
 
+    # Persist the exact normalized text used for chunking so source offsets
+    # reconstruct against Document.extracted_text.
+    document.extracted_text = normalized
+
     chunk_size, chunk_overlap = await _load_chunk_settings(db)
     validate_chunk_settings(chunk_size, chunk_overlap)
 
