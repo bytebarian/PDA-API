@@ -180,8 +180,27 @@ async def test_chunking_stage_history_completed_entry_has_chunk_count(
 
 async def test_chunking_fails_when_extracted_text_is_none(
     db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A document with no extracted text must fail the chunking stage."""
+
+    # The processing pipeline runs text extraction before chunking; for this test we
+    # intentionally keep extracted_text empty so chunking fails.
+    from app.domain.status import ProcessingJobStage
+    from app.services import processing_orchestrator
+
+    async def noop_text_extraction(
+        _db: AsyncSession, _doc: Document, job: ProcessingJob
+    ) -> None:
+        processing_orchestrator._append_stage_history(
+            job, stage=ProcessingJobStage.text_extraction, status="processing"
+        )
+        processing_orchestrator._append_stage_history(
+            job, stage=ProcessingJobStage.text_extraction, status="completed"
+        )
+
+    monkeypatch.setattr(processing_orchestrator, "_run_text_extraction_stage", noop_text_extraction)
+
     document = Document(
         filename="empty.txt",
         status="awaiting",
