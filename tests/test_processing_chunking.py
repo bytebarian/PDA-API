@@ -194,7 +194,9 @@ async def test_chunking_fails_when_extracted_text_is_none(
     db_session.add(job)
     await db_session.commit()
 
-    with pytest.raises(Exception, match="No extractable text"):
+    from app.services.chunking_service import ChunkingEmptyTextError
+
+    with pytest.raises(ChunkingEmptyTextError, match="No extractable text"):
         await process_job(db_session, job.id)
 
     refreshed_job = await db_session.get(ProcessingJob, job.id)
