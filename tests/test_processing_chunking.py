@@ -209,8 +209,27 @@ async def test_chunking_fails_when_extracted_text_is_none(
 
 async def test_chunking_fails_when_extracted_text_is_whitespace(
     db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A document with whitespace-only extracted text must fail the chunking stage."""
+
+    # The processing pipeline runs text extraction before chunking; for this test we
+    # intentionally keep extracted_text whitespace-only so chunking fails.
+    from app.domain.status import ProcessingJobStage
+    from app.services import processing_orchestrator
+
+    async def noop_text_extraction(
+        _db: AsyncSession, _doc: Document, job: ProcessingJob
+    ) -> None:
+        processing_orchestrator._append_stage_history(
+            job, stage=ProcessingJobStage.text_extraction, status="processing"
+        )
+        processing_orchestrator._append_stage_history(
+            job, stage=ProcessingJobStage.text_extraction, status="completed"
+        )
+
+    monkeypatch.setattr(processing_orchestrator, "_run_text_extraction_stage", noop_text_extraction)
+
     document = Document(
         filename="whitespace.txt",
         status="awaiting",
