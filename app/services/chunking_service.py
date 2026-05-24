@@ -191,7 +191,9 @@ async def _load_chunk_settings(db: AsyncSession) -> tuple[int, int]:
 
     Falls back to module-level defaults when no row exists.
     """
-    result = await db.execute(select(AppSettings).limit(1))
+    result = await db.execute(
+        select(AppSettings).order_by(AppSettings.updated_at.desc()).limit(1)
+    )
     settings = result.scalar_one_or_none()
     if settings is not None:
         return settings.chunk_size, settings.chunk_overlap
