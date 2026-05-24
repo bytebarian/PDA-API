@@ -8,7 +8,8 @@ configuration, runs the algorithm, and persists results into the
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from bisect import bisect_right
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from sqlalchemy import delete, select
@@ -83,6 +84,31 @@ _BOUNDARY_WINDOW = 200
 
 def _normalize_line_endings(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _crlf_positions_in_normalized_text(source_text: str) -> list[int]:
+    """Return normalized offsets after each collapsed CRLF sequence."""
+    positions: list[int] = []
+    source_index = 0
+    normalized_index = 0
+    while source_index < len(source_text):
+        if (
+            source_text[source_index] == "\r"
+            and source_index + 1 < len(source_text)
+            and source_text[source_index + 1] == "\n"
+        ):
+            source_index += 2
+            normalized_index += 1
+            positions.append(normalized_index)
+            continue
+        source_index += 1
+        normalized_index += 1
+    return positions
+
+
+def _normalized_offset_to_source_offset(normalized_offset: int, crlf_positions: list[int]) -> int:
+    """Convert an offset in normalized text back to the source-text offset."""
+    return normalized_offset + bisect_right(crlf_positions, normalized_offset)
 
 
 def _find_best_boundary(text: str, start: int, target_end: int) -> int:
@@ -267,17 +293,31 @@ async def chunk_document(
         ChunkingValidationError: When the persisted settings are invalid.
     """
     raw_text = document.extracted_text or ""
-    normalized = _normalize_line_endings(raw_text).strip()
-    if not normalized:
-        raise ChunkingEmptyTextError("No extractable text available for chunking")
 
     # Persist the exact normalized text used for chunking so source offsets
     # reconstruct against Document.extracted_text.
     document.extracted_text = normalized
 
     chunk_size, chunk_overlap = await _load_chunk_settings(db)
-    validate_chunk_settings(chunk_size, chunk_overlap)
+    chunks = chunk_text(raw_text, chunk_size, chunk_overlap)
+    if not chunks:
+        raise ChunkingEmptyTextError("No extractable text available for chunking")
 
-    chunks = chunk_text(normalized, chunk_size, chunk_overlap)
-    await replace_document_chunks(db, document, chunks)
-    return chunks
+    normalized_text = _normalize_line_endings(raw_text)
+    left_trimmed_count = len(normalized_text) - len(normalized_text.lstrip())
+    crlf_positions = _crlf_positions_in_normalized_text(raw_text)
+    source_relative_chunks = [
+        replace(
+            chunk,
+            start_offset=_normalized_offset_to_source_offset(
+                left_trimmed_count + chunk.start_offset, crlf_positions
+            ),
+            end_offset=_normalized_offset_to_source_offset(
+                left_trimmed_count + chunk.end_offset, crlf_positions
+            ),
+        )
+        for chunk in chunks
+    ]
+
+    await replace_document_chunks(db, document, source_relative_chunks)
+    return source_relative_chunks

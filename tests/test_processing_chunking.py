@@ -27,6 +27,23 @@ async def _load_chunks(db: AsyncSession, document: Document) -> list[DocumentChu
     return list(result.scalars().all())
 
 
+def _patch_noop_text_extraction(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.domain.status import ProcessingJobStage
+    from app.services import processing_orchestrator
+
+    async def noop_text_extraction(
+        _db: AsyncSession, _doc: Document, job: ProcessingJob
+    ) -> None:
+        processing_orchestrator._append_stage_history(
+            job, stage=ProcessingJobStage.text_extraction, status="processing"
+        )
+        processing_orchestrator._append_stage_history(
+            job, stage=ProcessingJobStage.text_extraction, status="completed"
+        )
+
+    monkeypatch.setattr(processing_orchestrator, "_run_text_extraction_stage", noop_text_extraction)
+
+
 # ---------------------------------------------------------------------------
 # Core persistence tests
 # ---------------------------------------------------------------------------
@@ -180,8 +197,11 @@ async def test_chunking_stage_history_completed_entry_has_chunk_count(
 
 async def test_chunking_fails_when_extracted_text_is_none(
     db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A document with no extracted text must fail the chunking stage."""
+    _patch_noop_text_extraction(monkeypatch)
+
     document = Document(
         filename="empty.txt",
         status="awaiting",
@@ -205,12 +225,19 @@ async def test_chunking_fails_when_extracted_text_is_none(
     assert refreshed_doc is not None
     assert refreshed_job.status == "failed"
     assert refreshed_doc.status == "failed"
+    assert any(
+        entry["stage"] == "chunking" and entry["status"] == "failed"
+        for entry in refreshed_job.stage_history_jsonb
+    )
 
 
 async def test_chunking_fails_when_extracted_text_is_whitespace(
     db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A document with whitespace-only extracted text must fail the chunking stage."""
+    _patch_noop_text_extraction(monkeypatch)
+
     document = Document(
         filename="whitespace.txt",
         status="awaiting",
@@ -324,3 +351,35 @@ async def test_chunk_offsets_reconstruct_content(db_session: AsyncSession) -> No
         assert chunk.source_end_offset is not None
         sliced = normalized[chunk.source_start_offset : chunk.source_end_offset].strip()
         assert sliced == chunk.content
+
+
+async def test_chunk_offsets_preserve_source_positions_with_crlf_and_padding(
+    db_session: AsyncSession,
+) -> None:
+    """Persisted offsets should resolve against the original extracted_text."""
+    raw_text = "  \r\nFirst sentence.\r\nSecond sentence.\r\n  "
+    document = Document(
+        filename="offsets_crlf.txt",
+        status="awaiting",
+        extracted_text=raw_text,
+    )
+    db_session.add(document)
+    await db_session.flush()
+
+    job = ProcessingJob(document_id=document.id, status="awaiting", stage="queued")
+    db_session.add(job)
+    await db_session.commit()
+
+    await process_job(db_session, job.id)
+
+    chunks = await _load_chunks(db_session, document)
+    assert chunks
+    first_chunk_start = chunks[0].source_start_offset
+    assert first_chunk_start is not None
+    assert first_chunk_start > 0
+
+    for chunk in chunks:
+        assert chunk.source_start_offset is not None
+        assert chunk.source_end_offset is not None
+        sliced = raw_text[chunk.source_start_offset : chunk.source_end_offset]
+        assert sliced.replace("\r\n", "\n").replace("\r", "\n").strip() == chunk.content

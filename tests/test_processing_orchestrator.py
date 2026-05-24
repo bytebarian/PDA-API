@@ -164,7 +164,7 @@ async def test_process_job_failed_stage_marks_job_and_document_failed(
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    document = Document(filename="fail.pdf", status="awaiting")
+    document = Document(filename="fail.pdf", status="awaiting", extracted_text="already extracted")
     db_session.add(document)
     await db_session.flush()
 
