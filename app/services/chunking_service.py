@@ -275,4 +275,3 @@ async def chunk_document(
 
     await replace_document_chunks(db, document, chunks)
     return chunks
-    return chunks

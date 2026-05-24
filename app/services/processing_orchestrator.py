@@ -153,16 +153,14 @@ async def _run_text_extraction_stage(
 
     needs_extraction = document.extracted_text is None or not document.extracted_text.strip()
     if needs_extraction:
-        if document.path is None or not document.path.strip():
-            raise RuntimeError("Document has no stored path for text extraction")
-
-        result = await extract_text_from_file(
-            Path(document.path),
-            mime_type=document.mime_type,
-            filename=document.filename,
-            document=document,
-        )
-        document.extracted_text = result.text
+        if document.path is not None and document.path.strip():
+            result = await extract_text_from_file(
+                Path(document.path),
+                mime_type=document.mime_type,
+                filename=document.filename,
+                document=document,
+            )
+            document.extracted_text = result.text
 
     _append_stage_history(
         job,
