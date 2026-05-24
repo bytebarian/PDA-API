@@ -156,7 +156,9 @@ async def _run_text_extraction_stage(
         stored_path = document.path or ""
         resolved_path = resolve_stored_file_path(get_settings().storage_path, stored_path)
         if resolved_path is None:
-            raise FileNotFoundError("Document file path is missing or outside storage root")
+            raise FileNotFoundError(
+                f"Document file path is missing or outside storage root for document {document.id}"
+            )
         result = await extract_text_from_file(
             resolved_path,
             mime_type=document.mime_type,

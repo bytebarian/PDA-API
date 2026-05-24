@@ -8,6 +8,7 @@ configuration, runs the algorithm, and persists results into the
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -85,21 +86,29 @@ def _normalize_line_endings(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
-def _normalized_to_source_offset_map(source_text: str) -> list[int]:
-    """Map normalized offsets (LF-normalized) back to source-text offsets."""
-    offsets = [0]
-    index = 0
-    while index < len(source_text):
-        if source_text[index] == "\r":
-            if index + 1 < len(source_text) and source_text[index + 1] == "\n":
-                index += 2
-            else:
-                index += 1
-            offsets.append(index)
+def _crlf_positions_in_normalized_text(source_text: str) -> list[int]:
+    """Return normalized offsets after each collapsed CRLF sequence."""
+    positions: list[int] = []
+    source_index = 0
+    normalized_index = 0
+    while source_index < len(source_text):
+        if (
+            source_text[source_index] == "\r"
+            and source_index + 1 < len(source_text)
+            and source_text[source_index + 1] == "\n"
+        ):
+            source_index += 2
+            normalized_index += 1
+            positions.append(normalized_index)
             continue
-        index += 1
-        offsets.append(index)
-    return offsets
+        source_index += 1
+        normalized_index += 1
+    return positions
+
+
+def _normalized_offset_to_source_offset(normalized_offset: int, crlf_positions: list[int]) -> int:
+    """Convert an offset in normalized text back to the source-text offset."""
+    return normalized_offset + bisect_right(crlf_positions, normalized_offset)
 
 
 def _find_best_boundary(text: str, start: int, target_end: int) -> int:
@@ -292,12 +301,16 @@ async def chunk_document(
 
     normalized_text = _normalize_line_endings(raw_text)
     left_trimmed_count = len(normalized_text) - len(normalized_text.lstrip())
-    normalized_offset_map = _normalized_to_source_offset_map(raw_text)
+    crlf_positions = _crlf_positions_in_normalized_text(raw_text)
     source_relative_chunks = [
         replace(
             chunk,
-            start_offset=normalized_offset_map[left_trimmed_count + chunk.start_offset],
-            end_offset=normalized_offset_map[left_trimmed_count + chunk.end_offset],
+            start_offset=_normalized_offset_to_source_offset(
+                left_trimmed_count + chunk.start_offset, crlf_positions
+            ),
+            end_offset=_normalized_offset_to_source_offset(
+                left_trimmed_count + chunk.end_offset, crlf_positions
+            ),
         )
         for chunk in chunks
     ]

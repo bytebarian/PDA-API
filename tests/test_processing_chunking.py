@@ -27,6 +27,23 @@ async def _load_chunks(db: AsyncSession, document: Document) -> list[DocumentChu
     return list(result.scalars().all())
 
 
+def _patch_noop_text_extraction(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.domain.status import ProcessingJobStage
+    from app.services import processing_orchestrator
+
+    async def noop_text_extraction(
+        _db: AsyncSession, _doc: Document, job: ProcessingJob
+    ) -> None:
+        processing_orchestrator._append_stage_history(
+            job, stage=ProcessingJobStage.text_extraction, status="processing"
+        )
+        processing_orchestrator._append_stage_history(
+            job, stage=ProcessingJobStage.text_extraction, status="completed"
+        )
+
+    monkeypatch.setattr(processing_orchestrator, "_run_text_extraction_stage", noop_text_extraction)
+
+
 # ---------------------------------------------------------------------------
 # Core persistence tests
 # ---------------------------------------------------------------------------
@@ -183,23 +200,7 @@ async def test_chunking_fails_when_extracted_text_is_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A document with no extracted text must fail the chunking stage."""
-
-    # The processing pipeline runs text extraction before chunking; for this test we
-    # intentionally keep extracted_text empty so chunking fails.
-    from app.domain.status import ProcessingJobStage
-    from app.services import processing_orchestrator
-
-    async def noop_text_extraction(
-        _db: AsyncSession, _doc: Document, job: ProcessingJob
-    ) -> None:
-        processing_orchestrator._append_stage_history(
-            job, stage=ProcessingJobStage.text_extraction, status="processing"
-        )
-        processing_orchestrator._append_stage_history(
-            job, stage=ProcessingJobStage.text_extraction, status="completed"
-        )
-
-    monkeypatch.setattr(processing_orchestrator, "_run_text_extraction_stage", noop_text_extraction)
+    _patch_noop_text_extraction(monkeypatch)
 
     document = Document(
         filename="empty.txt",
@@ -224,6 +225,10 @@ async def test_chunking_fails_when_extracted_text_is_none(
     assert refreshed_doc is not None
     assert refreshed_job.status == "failed"
     assert refreshed_doc.status == "failed"
+    assert any(
+        entry["stage"] == "chunking" and entry["status"] == "failed"
+        for entry in refreshed_job.stage_history_jsonb
+    )
 
 
 async def test_chunking_fails_when_extracted_text_is_whitespace(
@@ -231,23 +236,7 @@ async def test_chunking_fails_when_extracted_text_is_whitespace(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A document with whitespace-only extracted text must fail the chunking stage."""
-
-    # The processing pipeline runs text extraction before chunking; for this test we
-    # intentionally keep extracted_text whitespace-only so chunking fails.
-    from app.domain.status import ProcessingJobStage
-    from app.services import processing_orchestrator
-
-    async def noop_text_extraction(
-        _db: AsyncSession, _doc: Document, job: ProcessingJob
-    ) -> None:
-        processing_orchestrator._append_stage_history(
-            job, stage=ProcessingJobStage.text_extraction, status="processing"
-        )
-        processing_orchestrator._append_stage_history(
-            job, stage=ProcessingJobStage.text_extraction, status="completed"
-        )
-
-    monkeypatch.setattr(processing_orchestrator, "_run_text_extraction_stage", noop_text_extraction)
+    _patch_noop_text_extraction(monkeypatch)
 
     document = Document(
         filename="whitespace.txt",
