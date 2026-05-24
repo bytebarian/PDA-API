@@ -18,7 +18,7 @@ from app.services.processing_orchestrator import (
 
 
 async def test_process_job_success_updates_statuses_and_stage_history(db_session: AsyncSession) -> None:
-    document = Document(filename="success.pdf", status="awaiting")
+    document = Document(filename="success.pdf", status="awaiting", extracted_text="Sample text.")
     db_session.add(document)
     await db_session.flush()
 
@@ -60,7 +60,7 @@ async def test_process_job_success_updates_statuses_and_stage_history(db_session
 async def test_process_job_success_replaces_prepopulated_legacy_stage_history(
     db_session: AsyncSession,
 ) -> None:
-    document = Document(filename="reprocess.pdf", status="awaiting")
+    document = Document(filename="reprocess.pdf", status="awaiting", extracted_text="Sample text.")
     db_session.add(document)
     await db_session.flush()
 
@@ -107,7 +107,7 @@ async def test_process_job_success_replaces_prepopulated_legacy_stage_history(
 
 
 async def test_process_job_success_from_upload_received_stage(db_session: AsyncSession) -> None:
-    document = Document(filename="ingested.pdf", status="awaiting")
+    document = Document(filename="ingested.pdf", status="awaiting", extracted_text="Sample text.")
     db_session.add(document)
     await db_session.flush()
 
@@ -172,7 +172,9 @@ async def test_process_job_failed_stage_marks_job_and_document_failed(
     db_session.add(job)
     await db_session.commit()
 
-    async def fail_chunking(_: ProcessingJob) -> None:
+    async def fail_chunking(
+        _db: AsyncSession, _doc: Document, _job: ProcessingJob
+    ) -> None:
         raise RuntimeError("chunking exploded")
 
     monkeypatch.setattr(processing_orchestrator, "_run_chunking_stage", fail_chunking)
