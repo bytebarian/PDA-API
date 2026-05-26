@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     ocr_provider: str = "tesseract"
     ocr_language: str = "eng"
     ocr_dpi: int = 300
+    embedding_provider: str = "ollama"
+    embedding_model: str = "all-minilm"
+    embedding_dimensions: int = 1536
+    embedding_batch_size: int = 16
+    embedding_timeout_seconds: int = 60
+    embedding_truncate: bool = True
+    ollama_base_url: str = "http://localhost:11434"
 
     @field_validator("allowed_file_types", mode="before")
     @classmethod
@@ -53,7 +60,13 @@ class Settings(BaseSettings):
             prefix = f"/{prefix}"
         return prefix.rstrip("/")
 
-    @field_validator("max_file_size_bytes", "ocr_dpi")
+    @field_validator(
+        "max_file_size_bytes",
+        "ocr_dpi",
+        "embedding_dimensions",
+        "embedding_batch_size",
+        "embedding_timeout_seconds",
+    )
     @classmethod
     def must_be_positive(cls, value: int) -> int:
         if value <= 0:

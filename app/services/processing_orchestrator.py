@@ -195,8 +195,24 @@ async def _run_chunking_stage(
 async def _run_embedding_stage(
     db: AsyncSession, document: Document, job: ProcessingJob
 ) -> None:
+    from app.services.embedding_service import EmbeddingService
+
     _append_stage_history(job, stage=ProcessingJobStage.embedding, status="processing")
-    _append_stage_history(job, stage=ProcessingJobStage.embedding, status="completed")
+    result = await EmbeddingService(db).generate_embeddings_for_document(
+        document.id,
+        job_id=job.id,
+    )
+    _append_stage_history(
+        job,
+        stage=ProcessingJobStage.embedding,
+        status="completed",
+        details={
+            "embedded_chunk_count": result.embedded_chunk_count,
+            "provider": result.provider,
+            "model": result.model,
+            "dimensions": result.dimensions,
+        },
+    )
 
 
 async def _run_indexing_stage(
