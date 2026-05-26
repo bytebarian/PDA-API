@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 
+from app.adapters.embeddings.base import EmbeddingDimensionMismatchError
 from app.adapters.embeddings.base import EmbeddingResult
 
 _BYTE_TO_UNIT_SCALE = 127.5
@@ -25,7 +26,7 @@ class FakeEmbeddingProvider:
         del truncate
         vector_dimensions = dimensions if dimensions is not None else 8
         if vector_dimensions <= 0:
-            raise ValueError("dimensions must be greater than 0")
+            raise EmbeddingDimensionMismatchError("dimensions must be greater than 0")
 
         return [
             EmbeddingResult(

@@ -31,6 +31,13 @@ async def test_fake_provider_respects_requested_dimensions() -> None:
     assert len(result[0].vector) == 12
 
 
+async def test_fake_provider_raises_domain_error_for_invalid_dimensions() -> None:
+    provider = FakeEmbeddingProvider()
+
+    with pytest.raises(EmbeddingDimensionMismatchError, match="greater than 0"):
+        await provider.embed_texts(["hello"], model="fake-model", dimensions=0)
+
+
 async def test_ollama_provider_builds_api_embed_request_payload() -> None:
     import httpx
 
