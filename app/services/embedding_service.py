@@ -165,8 +165,11 @@ class EmbeddingService:
                         f"'{actual_model}' vs '{embedding.model}'"
                     )
 
-        authoritative_model = actual_model or runtime.model
-        document.embedding_model = authoritative_model
+        if actual_model is None:
+            raise EmbeddingProviderResponseError(
+                "Provider returned no model name; cannot determine authoritative embedding model"
+            )
+        document.embedding_model = actual_model
         document.chunk_count = len(chunks)
         document.last_indexed_at = _utcnow()
 
@@ -174,7 +177,7 @@ class EmbeddingService:
             document_id=document.id,
             embedded_chunk_count=embedded_count,
             provider=runtime.provider,
-            model=authoritative_model,
+            model=actual_model,
             dimensions=runtime.dimensions,
         )
 
