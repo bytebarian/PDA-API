@@ -142,6 +142,7 @@ async def test_ollama_provider_fails_on_dimension_mismatch() -> None:
 
 
 async def test_ollama_provider_reuses_and_closes_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    import asyncio
     import httpx
 
     clients: list[httpx.AsyncClient] = []
@@ -161,8 +162,10 @@ async def test_ollama_provider_reuses_and_closes_client(monkeypatch: pytest.Monk
     )
 
     try:
-        await provider.embed_texts(["first"], model="all-minilm", dimensions=2)
-        await provider.embed_texts(["second"], model="all-minilm", dimensions=2)
+        await asyncio.gather(
+            provider.embed_texts(["first"], model="all-minilm", dimensions=2),
+            provider.embed_texts(["second"], model="all-minilm", dimensions=2),
+        )
     finally:
         await provider.aclose()
 

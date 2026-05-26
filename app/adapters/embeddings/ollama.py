@@ -31,11 +31,16 @@ class OllamaEmbeddingProvider:
         self._timeout_seconds = timeout_seconds
         self._transport = transport
         self._client: httpx.AsyncClient | None = None
-        self._client_lock = asyncio.Lock()
+        self._client_lock: asyncio.Lock | None = None
+
+    def _get_client_lock(self) -> asyncio.Lock:
+        if self._client_lock is None:
+            self._client_lock = asyncio.Lock()
+        return self._client_lock
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
-            async with self._client_lock:
+            async with self._get_client_lock():
                 if self._client is None or self._client.is_closed:
                     self._client = httpx.AsyncClient(
                         base_url=self._base_url,
@@ -45,7 +50,7 @@ class OllamaEmbeddingProvider:
         return self._client
 
     async def aclose(self) -> None:
-        async with self._client_lock:
+        async with self._get_client_lock():
             if self._client is not None:
                 await self._client.aclose()
                 self._client = None
