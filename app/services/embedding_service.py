@@ -126,7 +126,7 @@ class EmbeddingService:
                 f"Unknown embedding provider '{runtime.provider}'"
             )
 
-        embedded_count = 0
+        pending_updates: list[tuple[DocumentChunk, list[float], str]] = []
         actual_model: str | None = None
         for start in range(0, len(chunks), runtime.batch_size):
             chunk_batch = chunks[start : start + runtime.batch_size]
@@ -154,9 +154,6 @@ class EmbeddingService:
                     raise EmbeddingDimensionMismatchError(
                         f"Embedding dimensions {embedding.dimensions} do not match expected {runtime.dimensions}"
                     )
-                chunk.embedding = embedding.vector
-                chunk.embedding_model = embedding.model
-                embedded_count += 1
                 if actual_model is None:
                     actual_model = embedding.model
                 elif actual_model != embedding.model:
@@ -164,11 +161,19 @@ class EmbeddingService:
                         f"Provider returned inconsistent model names across batches: "
                         f"'{actual_model}' vs '{embedding.model}'"
                     )
+                pending_updates.append((chunk, embedding.vector, embedding.model))
 
         if actual_model is None:
             raise EmbeddingProviderResponseError(
                 "Provider returned no model name; cannot determine authoritative embedding model"
             )
+
+        # Apply mutations atomically only after all batches have been fetched
+        # and validated, so a failed embedding run never leaves partial vectors.
+        for chunk, vector, model_name in pending_updates:
+            chunk.embedding = vector
+            chunk.embedding_model = model_name
+        embedded_count = len(pending_updates)
         document.embedding_model = actual_model
         document.chunk_count = len(chunks)
         document.last_indexed_at = _utcnow()
