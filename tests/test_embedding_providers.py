@@ -146,7 +146,7 @@ async def test_ollama_provider_reuses_and_closes_client(monkeypatch: pytest.Monk
 
     clients: list[httpx.AsyncClient] = []
 
-    class TrackingAsyncClient(httpx.AsyncClient):
+    class CountingAsyncClient(httpx.AsyncClient):
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             clients.append(self)
             super().__init__(*args, **kwargs)
@@ -154,7 +154,7 @@ async def test_ollama_provider_reuses_and_closes_client(monkeypatch: pytest.Monk
     async def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"model": "all-minilm", "embeddings": [[0.1, 0.2]]})
 
-    monkeypatch.setattr(httpx, "AsyncClient", TrackingAsyncClient)
+    monkeypatch.setattr(httpx, "AsyncClient", CountingAsyncClient)
     provider = OllamaEmbeddingProvider(
         base_url="http://localhost:11434",
         transport=httpx.MockTransport(handler),
