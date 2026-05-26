@@ -293,18 +293,19 @@ async def chunk_document(
         ChunkingValidationError: When the persisted settings are invalid.
     """
     raw_text = document.extracted_text or ""
-
-    # Persist the exact normalized text used for chunking so source offsets
-    # reconstruct against Document.extracted_text.
-    document.extracted_text = normalized
-
-    chunk_size, chunk_overlap = await _load_chunk_settings(db)
-    chunks = chunk_text(raw_text, chunk_size, chunk_overlap)
-    if not chunks:
+    normalized = _normalize_line_endings(raw_text).strip()
+    if not normalized:
         raise ChunkingEmptyTextError("No extractable text available for chunking")
 
-    normalized_text = _normalize_line_endings(raw_text)
-    left_trimmed_count = len(normalized_text) - len(normalized_text.lstrip())
+    # Chunk using normalized text, but keep Document.extracted_text unchanged
+    # because persisted offsets below are converted back to the original
+    # source-text coordinate space.
+
+    chunk_size, chunk_overlap = await _load_chunk_settings(db)
+    chunks = chunk_text(normalized, chunk_size, chunk_overlap)
+
+    normalized_untrimmed = _normalize_line_endings(raw_text)
+    left_trimmed_count = len(normalized_untrimmed) - len(normalized_untrimmed.lstrip())
     crlf_positions = _crlf_positions_in_normalized_text(raw_text)
     source_relative_chunks = [
         replace(
