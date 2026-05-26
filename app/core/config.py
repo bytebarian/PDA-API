@@ -73,6 +73,17 @@ class Settings(BaseSettings):
             raise ValueError("must be greater than 0")
         return value
 
+    @field_validator("embedding_dimensions")
+    @classmethod
+    def must_match_chunk_vector_dimensions(cls, value: int) -> int:
+        from app.models.document_chunk import EMBEDDING_DIMENSIONS
+
+        if value != EMBEDDING_DIMENSIONS:
+            raise ValueError(
+                f"must equal chunk vector dimensions ({EMBEDDING_DIMENSIONS})"
+            )
+        return value
+
     model_config = SettingsConfigDict(
         env_prefix="PDA_",
         env_file=".env",
