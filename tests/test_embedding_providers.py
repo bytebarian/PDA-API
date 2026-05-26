@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pytest
 
@@ -56,12 +57,15 @@ async def test_ollama_provider_builds_api_embed_request_payload() -> None:
         base_url="http://localhost:11434",
         transport=httpx.MockTransport(handler),
     )
-    await provider.embed_texts(
-        ["chunk text 1", "chunk text 2"],
-        model="all-minilm",
-        dimensions=2,
-        truncate=True,
-    )
+    try:
+        await provider.embed_texts(
+            ["chunk text 1", "chunk text 2"],
+            model="all-minilm",
+            dimensions=2,
+            truncate=True,
+        )
+    finally:
+        await provider.aclose()
 
     assert captured["method"] == "POST"
     assert captured["path"] == "/api/embed"
@@ -84,7 +88,10 @@ async def test_ollama_provider_parses_valid_response() -> None:
         transport=httpx.MockTransport(handler),
     )
 
-    result = await provider.embed_texts(["chunk"], model="all-minilm", dimensions=2)
+    try:
+        result = await provider.embed_texts(["chunk"], model="all-minilm", dimensions=2)
+    finally:
+        await provider.aclose()
 
     assert result[0].text_index == 0
     assert result[0].model == "all-minilm"
@@ -106,8 +113,11 @@ async def test_ollama_provider_fails_on_invalid_response_count() -> None:
         transport=httpx.MockTransport(handler),
     )
 
-    with pytest.raises(EmbeddingProviderResponseError, match="returned 1 embeddings for 2 texts"):
-        await provider.embed_texts(["chunk 1", "chunk 2"], model="all-minilm", dimensions=2)
+    try:
+        with pytest.raises(EmbeddingProviderResponseError, match="returned 1 embeddings for 2 texts"):
+            await provider.embed_texts(["chunk 1", "chunk 2"], model="all-minilm", dimensions=2)
+    finally:
+        await provider.aclose()
 
 
 async def test_ollama_provider_fails_on_dimension_mismatch() -> None:
@@ -124,5 +134,37 @@ async def test_ollama_provider_fails_on_dimension_mismatch() -> None:
         transport=httpx.MockTransport(handler),
     )
 
-    with pytest.raises(EmbeddingDimensionMismatchError, match="expected 3"):
-        await provider.embed_texts(["chunk"], model="all-minilm", dimensions=3)
+    try:
+        with pytest.raises(EmbeddingDimensionMismatchError, match="expected 3"):
+            await provider.embed_texts(["chunk"], model="all-minilm", dimensions=3)
+    finally:
+        await provider.aclose()
+
+
+async def test_ollama_provider_reuses_client_across_embed_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    import httpx
+
+    clients: list[httpx.AsyncClient] = []
+
+    class TrackingAsyncClient(httpx.AsyncClient):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            clients.append(self)
+            super().__init__(*args, **kwargs)
+
+    async def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"model": "all-minilm", "embeddings": [[0.1, 0.2]]})
+
+    monkeypatch.setattr(httpx, "AsyncClient", TrackingAsyncClient)
+    provider = OllamaEmbeddingProvider(
+        base_url="http://localhost:11434",
+        transport=httpx.MockTransport(handler),
+    )
+
+    try:
+        await provider.embed_texts(["first"], model="all-minilm", dimensions=2)
+        await provider.embed_texts(["second"], model="all-minilm", dimensions=2)
+    finally:
+        await provider.aclose()
+
+    assert len(clients) == 1
+    assert clients[0].is_closed

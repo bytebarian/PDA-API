@@ -29,6 +29,20 @@ class OllamaEmbeddingProvider:
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = timeout_seconds
         self._transport = transport
+        self._client: httpx.AsyncClient | None = None
+
+    def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                base_url=self._base_url,
+                timeout=self._timeout_seconds,
+                transport=self._transport,
+            )
+        return self._client
+
+    async def aclose(self) -> None:
+        if self._client is not None:
+            await self._client.aclose()
 
     async def embed_texts(
         self,
@@ -47,12 +61,7 @@ class OllamaEmbeddingProvider:
             payload["dimensions"] = dimensions
 
         try:
-            async with httpx.AsyncClient(
-                base_url=self._base_url,
-                timeout=self._timeout_seconds,
-                transport=self._transport,
-            ) as client:
-                response = await client.post("/api/embed", json=payload)
+            response = await self._get_client().post("/api/embed", json=payload)
         except httpx.TimeoutException as error:
             raise EmbeddingProviderUnavailableError(
                 f"Ollama request timed out after {self._timeout_seconds}s"
@@ -111,12 +120,10 @@ class OllamaEmbeddingProvider:
 
     async def healthcheck(self) -> bool:
         try:
-            async with httpx.AsyncClient(
-                base_url=self._base_url,
+            response = await self._get_client().get(
+                "/api/tags",
                 timeout=min(self._timeout_seconds, 5),
-                transport=self._transport,
-            ) as client:
-                response = await client.get("/api/tags")
-                return response.status_code < 400
+            )
+            return response.status_code < 400
         except httpx.HTTPError:
             return False
