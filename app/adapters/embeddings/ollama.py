@@ -65,7 +65,12 @@ class OllamaEmbeddingProvider:
                 f"Ollama returned HTTP {response.status_code}: {response.text}"
             )
 
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError as error:
+            raise EmbeddingProviderResponseError(
+                "Ollama response is not valid JSON"
+            ) from error
         embeddings = data.get("embeddings")
         if not isinstance(embeddings, list):
             raise EmbeddingProviderResponseError("Ollama response missing embeddings list")
