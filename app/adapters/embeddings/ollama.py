@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
@@ -30,20 +31,24 @@ class OllamaEmbeddingProvider:
         self._timeout_seconds = timeout_seconds
         self._transport = transport
         self._client: httpx.AsyncClient | None = None
+        self._client_lock = asyncio.Lock()
 
-    def _get_client(self) -> httpx.AsyncClient:
+    async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(
-                base_url=self._base_url,
-                timeout=self._timeout_seconds,
-                transport=self._transport,
-            )
+            async with self._client_lock:
+                if self._client is None or self._client.is_closed:
+                    self._client = httpx.AsyncClient(
+                        base_url=self._base_url,
+                        timeout=self._timeout_seconds,
+                        transport=self._transport,
+                    )
         return self._client
 
     async def aclose(self) -> None:
-        if self._client is not None:
-            await self._client.aclose()
-            self._client = None
+        async with self._client_lock:
+            if self._client is not None:
+                await self._client.aclose()
+                self._client = None
 
     async def embed_texts(
         self,
@@ -62,7 +67,8 @@ class OllamaEmbeddingProvider:
             payload["dimensions"] = dimensions
 
         try:
-            response = await self._get_client().post("/api/embed", json=payload)
+            client = await self._get_client()
+            response = await client.post("/api/embed", json=payload)
         except httpx.TimeoutException as error:
             raise EmbeddingProviderUnavailableError(
                 f"Ollama request timed out after {self._timeout_seconds}s"
@@ -121,7 +127,8 @@ class OllamaEmbeddingProvider:
 
     async def healthcheck(self) -> bool:
         try:
-            response = await self._get_client().get(
+            client = await self._get_client()
+            response = await client.get(
                 "/api/tags",
                 timeout=min(self._timeout_seconds, 5),
             )
