@@ -6,6 +6,8 @@ import hashlib
 
 from app.adapters.embeddings.base import EmbeddingResult
 
+_BYTE_TO_UNIT_SCALE = 127.5
+
 
 class FakeEmbeddingProvider:
     """Network-free deterministic embedding provider."""
@@ -49,6 +51,6 @@ def _deterministic_vector(text: str, model: str, dimensions: int) -> list[float]
             digest = hashlib.sha256(digest).digest()
             cursor = 0
         byte_value = digest[cursor]
-        output.append((byte_value / 127.5) - 1.0)
+        output.append((byte_value / _BYTE_TO_UNIT_SCALE) - 1.0)
         cursor += 1
     return output

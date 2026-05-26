@@ -20,6 +20,7 @@ from app.core.config import Settings, get_settings
 from app.models.app_settings import AppSettings
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk, EMBEDDING_DIMENSIONS
+from app.models.processing_job import ProcessingJob
 
 
 class EmbeddingServiceError(RuntimeError):
@@ -96,10 +97,18 @@ class EmbeddingService:
         dimensions: int | None = None,
         batch_size: int | None = None,
     ) -> EmbeddingGenerationResult:
-        del job_id
         document = await self._db.get(Document, document_id)
         if document is None:
             raise DocumentNotFoundError(f"Document not found: {document_id}")
+
+        if job_id is not None:
+            job = await self._db.get(ProcessingJob, job_id)
+            if job is None:
+                raise EmbeddingServiceError(f"Processing job not found: {job_id}")
+            if job.document_id != document.id:
+                raise EmbeddingServiceError(
+                    f"Processing job {job_id} does not belong to document {document.id}"
+                )
 
         chunks = await self._load_chunks(document_id)
         if not chunks or not any(chunk.content.strip() for chunk in chunks):

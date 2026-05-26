@@ -304,8 +304,8 @@ async def chunk_document(
     chunk_size, chunk_overlap = await _load_chunk_settings(db)
     chunks = chunk_text(normalized, chunk_size, chunk_overlap)
 
-    normalized_text = _normalize_line_endings(raw_text)
-    left_trimmed_count = len(normalized_text) - len(normalized_text.lstrip())
+    normalized_untrimmed = _normalize_line_endings(raw_text)
+    left_trimmed_count = len(normalized_untrimmed) - len(normalized_untrimmed.lstrip())
     crlf_positions = _crlf_positions_in_normalized_text(raw_text)
     source_relative_chunks = [
         replace(
