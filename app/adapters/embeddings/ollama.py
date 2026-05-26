@@ -135,6 +135,7 @@ class OllamaEmbeddingProvider:
             client = await self._get_client()
             response = await client.get(
                 "/api/tags",
+                # Keep healthchecks bounded even when embedding requests use longer timeouts.
                 timeout=min(self._timeout_seconds, 5),
             )
             return response.status_code < 400
