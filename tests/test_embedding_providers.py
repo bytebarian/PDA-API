@@ -141,7 +141,9 @@ async def test_ollama_provider_fails_on_dimension_mismatch() -> None:
         await provider.aclose()
 
 
-async def test_ollama_provider_reuses_and_closes_client(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_ollama_provider_reuses_client_across_concurrent_embed_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     import asyncio
     import httpx
 
@@ -166,8 +168,32 @@ async def test_ollama_provider_reuses_and_closes_client(monkeypatch: pytest.Monk
             provider.embed_texts(["first"], model="all-minilm", dimensions=2),
             provider.embed_texts(["second"], model="all-minilm", dimensions=2),
         )
+        assert len(clients) == 1
     finally:
         await provider.aclose()
+
+
+async def test_ollama_provider_closes_cached_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    import httpx
+
+    clients: list[httpx.AsyncClient] = []
+
+    class CountingAsyncClient(httpx.AsyncClient):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            clients.append(self)
+            super().__init__(*args, **kwargs)
+
+    async def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"model": "all-minilm", "embeddings": [[0.1, 0.2]]})
+
+    monkeypatch.setattr(httpx, "AsyncClient", CountingAsyncClient)
+    provider = OllamaEmbeddingProvider(
+        base_url="http://localhost:11434",
+        transport=httpx.MockTransport(handler),
+    )
+
+    await provider.embed_texts(["chunk"], model="all-minilm", dimensions=2)
+    await provider.aclose()
 
     assert len(clients) == 1
     assert clients[0].is_closed
