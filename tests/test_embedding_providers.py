@@ -141,7 +141,7 @@ async def test_ollama_provider_fails_on_dimension_mismatch() -> None:
         await provider.aclose()
 
 
-async def test_ollama_provider_reuses_client_across_embed_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_ollama_provider_reuses_and_closes_client(monkeypatch: pytest.MonkeyPatch) -> None:
     import httpx
 
     clients: list[httpx.AsyncClient] = []
