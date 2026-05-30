@@ -146,6 +146,15 @@ def test_upload_plain_text_returns_201(client: TestClient, tmp_path: Path) -> No
     assert response.status_code == 201
 
 
+def test_upload_image_jpg_returns_201(client: TestClient, tmp_path: Path) -> None:
+    """image/jpg uploads must be accepted for OCR processing."""
+    response = client.post(
+        "/documents/upload",
+        files={"file": ("scan.jpg", io.BytesIO(b"fake jpg"), "image/jpg")},
+    )
+    assert response.status_code == 201
+
+
 # ---------------------------------------------------------------------------
 # Validation failures
 # ---------------------------------------------------------------------------

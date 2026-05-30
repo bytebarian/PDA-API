@@ -108,6 +108,7 @@ async def test_app_settings_insert_and_read_defaults(db_session: AsyncSession) -
         "text/plain",
         "image/png",
         "image/jpeg",
+        "image/jpg",
     ]
     assert settings.ocr_enabled is True
     assert settings.ocr_provider == "tesseract"

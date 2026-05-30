@@ -131,6 +131,35 @@ PDA_DATABASE_URL=postgresql+asyncpg://pda:pda_dev@localhost:5432/pda
 
 > Replace `pda`, `pda_dev`, and the database name with the values you set for `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` if you changed the defaults.
 
+## Local OCR requirements
+
+Image OCR uses the local Tesseract CLI and does not send document content to external services.
+
+Install the engine and at least the English language pack before processing JPEG/JPG or PNG uploads, for example on Debian/Ubuntu:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y tesseract-ocr tesseract-ocr-eng
+```
+
+Relevant OCR environment variables:
+
+```bash
+PDA_OCR_PROVIDER=tesseract
+PDA_TESSERACT_CMD=tesseract
+PDA_TESSERACT_LANGUAGES=eng
+PDA_TESSERACT_TIMEOUT_SECONDS=120
+PDA_TESSERACT_PSM=6
+PDA_TESSERACT_OEM=3
+PDA_OCR_PREPROCESS_IMAGES=true
+```
+
+For deterministic tests without a local Tesseract install, set:
+
+```bash
+PDA_OCR_PROVIDER=fake
+```
+
 ## Project status
 
 The repository is in the Foundation phase. The backend development shell is in place with FastAPI app wiring, Docker-based local PostgreSQL + pgvector, Alembic migrations, and operational health endpoints. Higher-level business capabilities described above remain planned work for later phases.

@@ -1,8 +1,9 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import ValidationError, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -18,6 +19,7 @@ class Settings(BaseSettings):
         "text/plain",
         "image/png",
         "image/jpeg",
+        "image/jpg",
     )
     max_file_size_bytes: int = 10 * 1024 * 1024
 
@@ -27,6 +29,12 @@ class Settings(BaseSettings):
     ocr_provider: str = "tesseract"
     ocr_language: str = "eng"
     ocr_dpi: int = 300
+    tesseract_cmd: str = "tesseract"
+    tesseract_languages: Annotated[tuple[str, ...], NoDecode] = ("eng",)
+    tesseract_timeout_seconds: int = 120
+    tesseract_psm: int = 6
+    tesseract_oem: int = 3
+    ocr_preprocess_images: bool = True
     embedding_provider: str = "ollama"
     embedding_model: str = "all-minilm"
     embedding_dimensions: int = 1536
@@ -50,6 +58,21 @@ class Settings(BaseSettings):
 
         return parsed
 
+    @field_validator("tesseract_languages", mode="before")
+    @classmethod
+    def normalize_tesseract_languages(cls, value: object) -> tuple[str, ...]:
+        if isinstance(value, str):
+            parsed = tuple(item.strip() for item in value.split(",") if item.strip())
+        elif isinstance(value, (list, tuple, set)):
+            parsed = tuple(str(item).strip() for item in value if str(item).strip())
+        else:
+            raise ValueError("tesseract_languages must be a list or comma-separated string")
+
+        if not parsed:
+            raise ValueError("tesseract_languages must include at least one language")
+
+        return parsed
+
     @field_validator("api_prefix", mode="before")
     @classmethod
     def normalize_api_prefix(cls, value: object) -> str:
@@ -63,6 +86,9 @@ class Settings(BaseSettings):
     @field_validator(
         "max_file_size_bytes",
         "ocr_dpi",
+        "tesseract_timeout_seconds",
+        "tesseract_psm",
+        "tesseract_oem",
         "embedding_dimensions",
         "embedding_batch_size",
         "embedding_timeout_seconds",

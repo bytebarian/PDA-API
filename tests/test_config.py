@@ -12,6 +12,12 @@ def test_settings_defaults() -> None:
     assert settings.max_file_size_bytes > 0
     assert settings.model_provider == "local"
     assert settings.ocr_provider == "tesseract"
+    assert settings.tesseract_cmd == "tesseract"
+    assert settings.tesseract_languages == ("eng",)
+    assert settings.tesseract_timeout_seconds == 120
+    assert settings.tesseract_psm == 6
+    assert settings.tesseract_oem == 3
+    assert settings.ocr_preprocess_images is True
     assert settings.embedding_provider == "ollama"
     assert settings.embedding_model == "all-minilm"
     assert settings.embedding_dimensions == 1536
@@ -26,6 +32,8 @@ def test_settings_reads_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PDA_MAX_FILE_SIZE_BYTES", "512")
     monkeypatch.setenv("PDA_MODEL_NAME", "custom-local-model")
     monkeypatch.setenv("PDA_EMBEDDING_PROVIDER", "fake")
+    monkeypatch.setenv("PDA_TESSERACT_LANGUAGES", "eng,deu")
+    monkeypatch.setenv("PDA_TESSERACT_TIMEOUT_SECONDS", "45")
 
     settings = Settings()
 
@@ -33,6 +41,8 @@ def test_settings_reads_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.max_file_size_bytes == 512
     assert settings.model_name == "custom-local-model"
     assert settings.embedding_provider == "fake"
+    assert settings.tesseract_languages == ("eng", "deu")
+    assert settings.tesseract_timeout_seconds == 45
 
 
 def test_invalid_settings_fail_clearly() -> None:

@@ -112,13 +112,19 @@ def _mark_failed(
         "message": message,
     }
     job.error_details_jsonb = details
-    _append_stage_history(
-        job,
-        stage=failed_stage,
-        status="failed",
-        message="Stage failed",
-        details=details,
-    )
+    last_entry = job.stage_history_jsonb[-1] if job.stage_history_jsonb else None
+    if not (
+        isinstance(last_entry, dict)
+        and last_entry.get("stage") == failed_stage.value
+        and last_entry.get("status") == "failed"
+    ):
+        _append_stage_history(
+            job,
+            stage=failed_stage,
+            status="failed",
+            message="Stage failed",
+            details=details,
+        )
 
 
 async def _run_queued_stage(
@@ -138,20 +144,39 @@ async def _run_upload_received_stage(
 async def _run_ocr_stage(
     db: AsyncSession, document: Document, job: ProcessingJob
 ) -> None:
-    _append_stage_history(job, stage=ProcessingJobStage.ocr, status="processing")
-    _append_stage_history(job, stage=ProcessingJobStage.ocr, status="completed")
+    from app.services.ocr_service import OCRService, document_requires_ocr
+
+    if not document_requires_ocr(document):
+        _append_stage_history(
+            job,
+            stage=ProcessingJobStage.ocr,
+            status="processing",
+        )
+        _append_stage_history(
+            job,
+            stage=ProcessingJobStage.ocr,
+            status="completed",
+            details={"skipped": True},
+        )
+        return
+
+    await OCRService(db).extract_text_for_document(document.id, job_id=job.id)
 
 
 async def _run_text_extraction_stage(
     db: AsyncSession, document: Document, job: ProcessingJob
 ) -> None:
     from app.core.config import get_settings
+    from app.services.ocr_service import document_requires_ocr
     from app.services.file_storage import resolve_stored_file_path
     from app.services.text_extraction import extract_text_from_file
 
     _append_stage_history(job, stage=ProcessingJobStage.text_extraction, status="processing")
 
-    needs_extraction = document.extracted_text is None or not document.extracted_text.strip()
+    needs_extraction = (
+        not document_requires_ocr(document)
+        and (document.extracted_text is None or not document.extracted_text.strip())
+    )
     if needs_extraction:
         stored_path = document.path or ""
         resolved_path = resolve_stored_file_path(get_settings().storage_path, stored_path)
