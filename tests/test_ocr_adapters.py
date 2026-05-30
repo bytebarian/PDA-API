@@ -198,3 +198,38 @@ async def test_tesseract_provider_rejects_malformed_tsv_output(
 
     with pytest.raises(OCRProviderResponseError, match="malformed TSV"):
         await TesseractOCRProvider().extract_text(file_path, mime_type="image/png")
+
+
+async def test_tesseract_provider_caches_engine_version(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    file_path = tmp_path / "image.png"
+    file_path.write_bytes(b"fake png")
+
+    version_calls = 0
+
+    def fake_run(
+        args: list[str],
+        *,
+        capture_output: bool,
+        text: bool,
+        check: bool,
+        timeout: int | None,
+    ) -> subprocess.CompletedProcess[str]:
+        nonlocal version_calls
+        del capture_output, text, check, timeout
+        if "--version" in args:
+            version_calls += 1
+            return _completed_process(args, stdout="tesseract 5.4.0\n")
+        if args[-1] == "tsv":
+            return _completed_process(args, stdout="level\tpage_num\tconf\ttext\n")
+        return _completed_process(args, stdout="Recognized text\n")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    provider = TesseractOCRProvider()
+    await provider.extract_text(file_path, mime_type="image/png")
+    await provider.extract_text(file_path, mime_type="image/png")
+
+    assert version_calls == 1
