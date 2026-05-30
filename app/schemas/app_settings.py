@@ -18,7 +18,7 @@ DEFAULT_ALLOWED_FILE_TYPES = (
     "text/markdown",
     "image/png",
     "image/jpeg",
-    "image/jpeg",
+    "image/jpg",
     "image/tiff",
 )
 DEFAULT_OCR_PROVIDER = "tesseract"

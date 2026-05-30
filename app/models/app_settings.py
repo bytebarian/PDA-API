@@ -20,6 +20,7 @@ DEFAULT_ALLOWED_FILE_TYPES = (
     "text/plain",
     "image/png",
     "image/jpeg",
+    "image/jpg",
 )
 DEFAULT_OCR_PROVIDER = "tesseract"
 DEFAULT_OCR_LANGUAGE = "eng"
