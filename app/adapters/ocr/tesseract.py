@@ -41,6 +41,7 @@ class TesseractOCRProvider:
         self.default_timeout_seconds = default_timeout_seconds
         self.psm = psm
         self.oem = oem
+        self._cached_engine_version: str | None = None
 
     async def extract_text(
         self,
@@ -115,6 +116,8 @@ class TesseractOCRProvider:
         return True
 
     async def _get_engine_version(self) -> str:
+        if self._cached_engine_version is not None:
+            return self._cached_engine_version
         process = await self._run_command(
             [self.command, "--version"],
             timeout_seconds=self.default_timeout_seconds,
@@ -122,7 +125,8 @@ class TesseractOCRProvider:
         first_line = process.stdout.splitlines()[0].strip() if process.stdout else ""
         if not first_line:
             raise OCRProviderResponseError("Tesseract did not return a version string")
-        return first_line
+        self._cached_engine_version = first_line
+        return self._cached_engine_version
 
     async def _run_tesseract(
         self,
