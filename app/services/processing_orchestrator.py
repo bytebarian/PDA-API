@@ -200,6 +200,111 @@ async def _run_text_extraction_stage(
     )
 
 
+async def _run_normalize_text_stage(
+    db: AsyncSession, document: Document, job: ProcessingJob
+) -> None:
+    from app.core.config import get_settings
+    from app.services.text_normalization import (
+        TextNormalizationEmptyInputError,
+        TextNormalizationEmptyOutputError,
+        TextNormalizationOptions,
+        normalize_text,
+    )
+
+    settings = get_settings()
+    _append_stage_history(job, stage=ProcessingJobStage.normalize_text, status="processing")
+
+    if not settings.text_normalization_enabled:
+        _append_stage_history(
+            job,
+            stage=ProcessingJobStage.normalize_text,
+            status="completed",
+            details={"skipped": True},
+        )
+        return
+
+    raw_text = document.extracted_text
+
+    # Handle absent/empty input according to pipeline policy.
+    if raw_text is None:
+        if settings.text_normalization_fail_on_empty_output:
+            raise TextNormalizationEmptyInputError(
+                "No extracted text available for normalization"
+            )
+        _append_stage_history(
+            job,
+            stage=ProcessingJobStage.normalize_text,
+            status="completed",
+            details={"skipped": True, "reason": "no_input"},
+        )
+        return
+
+    if raw_text == "":
+        if settings.text_normalization_fail_on_empty_output:
+            raise TextNormalizationEmptyInputError(
+                "Extracted text is empty and cannot be normalized"
+            )
+        _append_stage_history(
+            job,
+            stage=ProcessingJobStage.normalize_text,
+            status="completed",
+            details={"skipped": True, "reason": "empty_input"},
+        )
+        return
+
+    options = TextNormalizationOptions(
+        unicode_form=settings.text_normalization_unicode_form,
+        max_blank_lines=settings.text_normalization_max_blank_lines,
+        dehyphenate_line_breaks=settings.text_normalization_dehyphenate_line_breaks,
+        remove_control_characters=settings.text_normalization_remove_control_chars,
+    )
+    result = normalize_text(
+        raw_text,
+        options=options,
+        warn_removal_ratio=settings.text_normalization_warn_removal_ratio,
+    )
+    if settings.text_normalization_fail_on_empty_output and result.output_character_count == 0:
+        raise TextNormalizationEmptyOutputError(
+            "Normalization produced empty output from non-empty input"
+        )
+
+    # Persist the normalized text as the canonical downstream representation.
+    # Raw extraction provenance is recorded in metadata_jsonb["normalization"]
+    # so it remains inspectable without duplicating large text blobs.
+    document.extracted_text = result.normalized_text
+
+    # Keys use snake_case to match the existing pipeline provenance schema
+    # (e.g. OCR metadata in metadata_jsonb["ocr"]).
+    normalization_meta: dict[str, Any] = {
+        "provider": "pda-local-normalizer",
+        "rule_set_version": result.rule_set_version,
+        "input_character_count": result.input_character_count,
+        "output_character_count": result.output_character_count,
+        "input_line_count": result.input_line_count,
+        "output_line_count": result.output_line_count,
+        "changed": result.changed,
+        "warnings": [
+            {"code": w.code, "message": w.message} for w in result.warnings
+        ],
+    }
+    metadata = dict(document.metadata_jsonb or {})
+    metadata["normalization"] = normalization_meta
+    document.metadata_jsonb = metadata
+
+    _append_stage_history(
+        job,
+        stage=ProcessingJobStage.normalize_text,
+        status="completed",
+        details={
+            "input_char_count": result.input_character_count,
+            "output_char_count": result.output_character_count,
+            "changed": result.changed,
+            "rule_set_version": result.rule_set_version,
+            "warning_count": len(result.warnings),
+        },
+    )
+
+
 async def _run_chunking_stage(
     db: AsyncSession, document: Document, job: ProcessingJob
 ) -> None:
@@ -253,6 +358,7 @@ def _stage_flow(start_stage: ProcessingJobStage) -> tuple[tuple[ProcessingJobSta
         (ProcessingJobStage.queued, _run_queued_stage),
         (ProcessingJobStage.ocr, _run_ocr_stage),
         (ProcessingJobStage.text_extraction, _run_text_extraction_stage),
+        (ProcessingJobStage.normalize_text, _run_normalize_text_stage),
         (ProcessingJobStage.chunking, _run_chunking_stage),
         (ProcessingJobStage.embedding, _run_embedding_stage),
         (ProcessingJobStage.indexing, _run_indexing_stage),
