@@ -246,6 +246,12 @@ def normalize_text(
         TextNormalizationError: When *text* is not a ``str``.
         TextNormalizationConfigurationError: When *options* contains invalid
             settings, for example an unknown Unicode form.
+
+        Note:
+            Empty/whitespace input enforcement (raising
+            :class:`TextNormalizationEmptyInputError` /
+            :class:`TextNormalizationEmptyOutputError`) is performed by the
+            processing pipeline stage, not by this pure function.
     """
     if not isinstance(text, str):
         raise TextNormalizationError(
