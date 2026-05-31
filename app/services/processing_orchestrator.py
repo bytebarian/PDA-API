@@ -225,7 +225,7 @@ async def _run_normalize_text_stage(
 
     raw_text = document.extracted_text
 
-    # Handle absent input according to pipeline policy.
+    # Handle absent/empty input according to pipeline policy.
     if raw_text is None:
         if settings.text_normalization_fail_on_empty_output:
             raise TextNormalizationEmptyInputError(
@@ -239,29 +239,18 @@ async def _run_normalize_text_stage(
         )
         return
 
-    options = TextNormalizationOptions(
-        unicode_form=settings.text_normalization_unicode_form,
-        max_blank_lines=settings.text_normalization_max_blank_lines,
-        dehyphenate_line_breaks=settings.text_normalization_dehyphenate_line_breaks,
-        remove_control_characters=settings.text_normalization_remove_control_chars,
-    )
-
-    result = normalize_text(
-        raw_text,
-        options,
-        warn_removal_ratio=settings.text_normalization_warn_removal_ratio,
-    )
-
-    # Fail when non-empty input normalises to nothing (avoids silent data loss).
-    # Use `raw_text` (not `.strip()`) so whitespace-only inputs are also caught.
-    if (
-        not result.normalized_text
-        and raw_text
-        and settings.text_normalization_fail_on_empty_output
-    ):
-        raise TextNormalizationEmptyOutputError(
-            "Normalization produced empty output from non-empty extracted text"
+    if raw_text == "":
+        if settings.text_normalization_fail_on_empty_output:
+            raise TextNormalizationEmptyInputError(
+                "Extracted text is empty and cannot be normalized"
+            )
+        _append_stage_history(
+            job,
+            stage=ProcessingJobStage.normalize_text,
+            status="completed",
+            details={"skipped": True, "reason": "empty_input"},
         )
+        return
 
     # Persist the normalized text as the canonical downstream representation.
     # Raw extraction provenance is recorded in metadata_jsonb["normalization"]
