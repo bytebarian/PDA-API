@@ -507,27 +507,13 @@ async def test_ocr_output_is_normalized_before_chunking(
     await db_session.commit()
 
     # Patch OCR and text_extraction to noops so only normalization + chunking run.
-    from app.domain.status import ProcessingJobStage
-
     async def noop_ocr(
         _db: AsyncSession, _doc: Document, _job: ProcessingJob
     ) -> None:
         pass
 
-    async def noop_text_extraction(
-        _db: AsyncSession, _doc: Document, _job: ProcessingJob
-    ) -> None:
-        processing_orchestrator._append_stage_history(
-            _job, stage=ProcessingJobStage.text_extraction, status="processing"
-        )
-        processing_orchestrator._append_stage_history(
-            _job, stage=ProcessingJobStage.text_extraction, status="completed"
-        )
-
     monkeypatch.setattr(processing_orchestrator, "_run_ocr_stage", noop_ocr)
-    monkeypatch.setattr(
-        processing_orchestrator, "_run_text_extraction_stage", noop_text_extraction
-    )
+    _patch_noop_text_extraction(monkeypatch)
 
     await process_job(db_session, job.id)
 

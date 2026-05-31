@@ -115,7 +115,8 @@ class TextNormalizationResult:
 # ---------------------------------------------------------------------------
 
 # Matches ASCII control characters except \n (0x0a).
-# Preserves: 0x09 (tab, handled separately), 0x0a (newline, kept).
+# Excludes: 0x09 (tab, handled separately in whitespace normalization),
+#           0x0a (newline, kept as paragraph separator).
 _CONTROL_CHAR_RE = re.compile(
     r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]"
 )

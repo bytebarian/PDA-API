@@ -324,8 +324,8 @@ def test_output_line_count() -> None:
 
 def test_high_removal_ratio_emits_warning() -> None:
     # Create text that shrinks by > 30% after normalization (all control chars).
-    junk = "\x01" * 100
-    result = normalize_text(junk, warn_removal_ratio=0.30)
+    control_chars_text = "\x01" * 100
+    result = normalize_text(control_chars_text, warn_removal_ratio=0.30)
     codes = [w.code for w in result.warnings]
     assert "HIGH_REMOVAL_RATIO" in codes
     assert "EMPTY_OUTPUT" in codes
@@ -343,8 +343,8 @@ def test_no_warnings_for_clean_text() -> None:
 
 
 def test_warning_details_contain_ratio() -> None:
-    junk = "\x01" * 100
-    result = normalize_text(junk, warn_removal_ratio=0.30)
+    control_chars_text = "\x01" * 100
+    result = normalize_text(control_chars_text, warn_removal_ratio=0.30)
     high_removal = next(w for w in result.warnings if w.code == "HIGH_REMOVAL_RATIO")
     assert "removal_ratio" in high_removal.details
 
