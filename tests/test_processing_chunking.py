@@ -44,6 +44,24 @@ def _patch_noop_text_extraction(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(processing_orchestrator, "_run_text_extraction_stage", noop_text_extraction)
 
 
+def _patch_noop_normalization(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Bypass the normalize_text stage so tests can focus on chunking behaviour."""
+    from app.domain.status import ProcessingJobStage
+    from app.services import processing_orchestrator
+
+    async def noop_normalization(
+        _db: AsyncSession, _doc: Document, job: ProcessingJob
+    ) -> None:
+        processing_orchestrator._append_stage_history(
+            job, stage=ProcessingJobStage.normalize_text, status="processing"
+        )
+        processing_orchestrator._append_stage_history(
+            job, stage=ProcessingJobStage.normalize_text, status="completed"
+        )
+
+    monkeypatch.setattr(processing_orchestrator, "_run_normalize_text_stage", noop_normalization)
+
+
 # ---------------------------------------------------------------------------
 # Core persistence tests
 # ---------------------------------------------------------------------------
@@ -199,7 +217,7 @@ async def test_chunking_fails_when_extracted_text_is_none(
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A document with no extracted text must fail the chunking stage."""
+    """A document with no extracted text must fail the normalize_text stage."""
     _patch_noop_text_extraction(monkeypatch)
 
     document = Document(
@@ -214,9 +232,9 @@ async def test_chunking_fails_when_extracted_text_is_none(
     db_session.add(job)
     await db_session.commit()
 
-    from app.services.chunking_service import ChunkingEmptyTextError
+    from app.services.text_normalization import TextNormalizationEmptyInputError
 
-    with pytest.raises(ChunkingEmptyTextError, match="No extractable text"):
+    with pytest.raises(TextNormalizationEmptyInputError):
         await process_job(db_session, job.id)
 
     refreshed_job = await db_session.get(ProcessingJob, job.id)
@@ -226,7 +244,7 @@ async def test_chunking_fails_when_extracted_text_is_none(
     assert refreshed_job.status == "failed"
     assert refreshed_doc.status == "failed"
     assert any(
-        entry["stage"] == "chunking" and entry["status"] == "failed"
+        entry["stage"] == "normalize_text" and entry["status"] == "failed"
         for entry in refreshed_job.stage_history_jsonb
     )
 
@@ -235,7 +253,7 @@ async def test_chunking_fails_when_extracted_text_is_whitespace(
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A document with whitespace-only extracted text must fail the chunking stage."""
+    """A document with whitespace-only extracted text must fail the normalize_text stage."""
     _patch_noop_text_extraction(monkeypatch)
 
     document = Document(
@@ -250,16 +268,19 @@ async def test_chunking_fails_when_extracted_text_is_whitespace(
     db_session.add(job)
     await db_session.commit()
 
-    from app.services.chunking_service import ChunkingEmptyTextError
+    from app.services.text_normalization import TextNormalizationEmptyOutputError
 
-    with pytest.raises(ChunkingEmptyTextError, match="No extractable text"):
+    with pytest.raises(TextNormalizationEmptyOutputError):
         await process_job(db_session, job.id)
 
     refreshed_job = await db_session.get(ProcessingJob, job.id)
     assert refreshed_job is not None
     assert refreshed_job.status == "failed"
     assert refreshed_job.error_message is not None
-    assert "No extractable text" in refreshed_job.error_message
+    assert any(
+        entry["stage"] == "normalize_text" and entry["status"] == "failed"
+        for entry in refreshed_job.stage_history_jsonb
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -356,7 +377,12 @@ async def test_chunk_offsets_reconstruct_content(db_session: AsyncSession) -> No
 async def test_chunk_offsets_preserve_source_positions_with_crlf_and_padding(
     db_session: AsyncSession,
 ) -> None:
-    """Persisted offsets should resolve against the original extracted_text."""
+    """After normalization, offsets resolve against the normalized extracted_text.
+
+    The normalization stage converts CRLF→LF and trims leading/trailing
+    whitespace before chunking.  Chunk offsets therefore reference the
+    normalized canonical text stored in ``Document.extracted_text``.
+    """
     raw_text = "  \r\nFirst sentence.\r\nSecond sentence.\r\n  "
     document = Document(
         filename="offsets_crlf.txt",
@@ -372,14 +398,22 @@ async def test_chunk_offsets_preserve_source_positions_with_crlf_and_padding(
 
     await process_job(db_session, job.id)
 
+    # Fetch the document after normalization to get the canonical text.
+    refreshed = await db_session.get(Document, document.id)
+    assert refreshed is not None
+    normalized_text = refreshed.extracted_text or ""
+    # Normalization strips leading/trailing whitespace and converts CRLF→LF.
+    assert normalized_text == normalized_text.strip()
+    assert "\r" not in normalized_text
+
     chunks = await _load_chunks(db_session, document)
     assert chunks
-    first_chunk_start = chunks[0].source_start_offset
-    assert first_chunk_start is not None
-    assert first_chunk_start > 0
+    # After normalization the text is already trimmed, so first offset is 0.
+    assert chunks[0].source_start_offset == 0
 
     for chunk in chunks:
         assert chunk.source_start_offset is not None
         assert chunk.source_end_offset is not None
-        sliced = raw_text[chunk.source_start_offset : chunk.source_end_offset]
-        assert sliced.replace("\r\n", "\n").replace("\r", "\n").strip() == chunk.content
+        sliced = normalized_text[chunk.source_start_offset : chunk.source_end_offset].strip()
+        assert sliced == chunk.content
+

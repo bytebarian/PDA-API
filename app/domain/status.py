@@ -36,6 +36,7 @@ class ProcessingJobStage(str, Enum):
     upload_received = "upload_received"
     ocr = "ocr"
     text_extraction = "text_extraction"
+    normalize_text = "normalize_text"
     chunking = "chunking"
     embedding = "embedding"
     indexing = "indexing"

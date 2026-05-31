@@ -43,6 +43,15 @@ class Settings(BaseSettings):
     embedding_truncate: bool = True
     ollama_base_url: str = "http://localhost:11434"
 
+    # Text normalization settings
+    text_normalization_enabled: bool = True
+    text_normalization_unicode_form: str = "NFKC"
+    text_normalization_max_blank_lines: int = 1
+    text_normalization_dehyphenate_line_breaks: bool = True
+    text_normalization_remove_control_chars: bool = True
+    text_normalization_fail_on_empty_output: bool = True
+    text_normalization_warn_removal_ratio: float = 0.30
+
     @field_validator("allowed_file_types", mode="before")
     @classmethod
     def normalize_allowed_file_types(cls, value: object) -> tuple[str, ...]:
