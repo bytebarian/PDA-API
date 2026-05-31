@@ -118,8 +118,8 @@ _CONTROL_CHAR_RE = re.compile(
     r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]"
 )
 
-# Matches lines that contain only 5+ repeated separator characters with no
-# alphanumeric content.  Conservative OCR artifact cleanup.
+# Matches lines that contain only 5+ non-word characters (no alphanumeric
+# content). Conservative OCR artifact cleanup.
 _SEPARATOR_LINE_RE = re.compile(
     r"(?m)^[^\w\n]{5,}$"
 )
