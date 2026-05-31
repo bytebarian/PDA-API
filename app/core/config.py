@@ -65,6 +65,7 @@ class Settings(BaseSettings):
         if not 0 <= value <= 1:
             raise ValueError("must be between 0 and 1")
         return value
+
     @field_validator("allowed_file_types", mode="before")
     @classmethod
     def normalize_allowed_file_types(cls, value: object) -> tuple[str, ...]:
