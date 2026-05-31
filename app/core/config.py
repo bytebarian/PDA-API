@@ -52,6 +52,19 @@ class Settings(BaseSettings):
     text_normalization_fail_on_empty_output: bool = True
     text_normalization_warn_removal_ratio: float = 0.30
 
+    @field_validator("text_normalization_max_blank_lines")
+    @classmethod
+    def text_normalization_max_blank_lines_must_be_non_negative(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("must be greater than or equal to 0")
+        return value
+
+    @field_validator("text_normalization_warn_removal_ratio")
+    @classmethod
+    def text_normalization_warn_removal_ratio_must_be_fraction(cls, value: float) -> float:
+        if not 0 <= value <= 1:
+            raise ValueError("must be between 0 and 1")
+        return value
     @field_validator("allowed_file_types", mode="before")
     @classmethod
     def normalize_allowed_file_types(cls, value: object) -> tuple[str, ...]:
