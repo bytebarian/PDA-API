@@ -252,6 +252,22 @@ async def _run_normalize_text_stage(
         )
         return
 
+    options = TextNormalizationOptions(
+        unicode_form=settings.text_normalization_unicode_form,
+        max_blank_lines=settings.text_normalization_max_blank_lines,
+        dehyphenate_line_breaks=settings.text_normalization_dehyphenate_line_breaks,
+        remove_control_characters=settings.text_normalization_remove_control_chars,
+    )
+    result = normalize_text(
+        raw_text,
+        options=options,
+        warn_removal_ratio=settings.text_normalization_warn_removal_ratio,
+    )
+    if settings.text_normalization_fail_on_empty_output and result.output_character_count == 0:
+        raise TextNormalizationEmptyOutputError(
+            "Normalization produced empty output from non-empty input"
+        )
+
     # Persist the normalized text as the canonical downstream representation.
     # Raw extraction provenance is recorded in metadata_jsonb["normalization"]
     # so it remains inspectable without duplicating large text blobs.
