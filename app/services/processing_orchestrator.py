@@ -273,14 +273,15 @@ async def _run_normalize_text_stage(
     # so it remains inspectable without duplicating large text blobs.
     document.extracted_text = result.normalized_text
 
-    # Keys are camelCase for backward compatibility with the normalization metadata contract.
+    # Keys use snake_case to match the existing pipeline provenance schema
+    # (e.g. OCR metadata in metadata_jsonb["ocr"]).
     normalization_meta: dict[str, Any] = {
         "provider": "pda-local-normalizer",
-        "ruleSetVersion": result.rule_set_version,
-        "inputCharacterCount": result.input_character_count,
-        "outputCharacterCount": result.output_character_count,
-        "inputLineCount": result.input_line_count,
-        "outputLineCount": result.output_line_count,
+        "rule_set_version": result.rule_set_version,
+        "input_character_count": result.input_character_count,
+        "output_character_count": result.output_character_count,
+        "input_line_count": result.input_line_count,
+        "output_line_count": result.output_line_count,
         "changed": result.changed,
         "warnings": [
             {"code": w.code, "message": w.message} for w in result.warnings

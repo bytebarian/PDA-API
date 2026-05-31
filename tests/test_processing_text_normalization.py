@@ -100,9 +100,9 @@ async def test_normalization_stores_metadata_in_document(db_session: AsyncSessio
     norm_meta = refreshed.metadata_jsonb.get("normalization")
     assert norm_meta is not None
     assert norm_meta["provider"] == "pda-local-normalizer"
-    assert norm_meta["ruleSetVersion"] == "pda-normalization-v1"
-    assert isinstance(norm_meta["inputCharacterCount"], int)
-    assert isinstance(norm_meta["outputCharacterCount"], int)
+    assert norm_meta["rule_set_version"] == "pda-normalization-v1"
+    assert isinstance(norm_meta["input_character_count"], int)
+    assert isinstance(norm_meta["output_character_count"], int)
     assert isinstance(norm_meta["changed"], bool)
     assert isinstance(norm_meta["warnings"], list)
 
