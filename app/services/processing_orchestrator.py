@@ -273,8 +273,7 @@ async def _run_normalize_text_stage(
     # so it remains inspectable without duplicating large text blobs.
     document.extracted_text = result.normalized_text
 
-    # Keys are camelCase to match the JSON schema expected by frontend consumers.
-    # Note: existing OCR metadata currently uses snake_case keys (see ocr_service.py).
+    # Keys are camelCase for backward compatibility with the normalization metadata contract.
     normalization_meta: dict[str, Any] = {
         "provider": "pda-local-normalizer",
         "ruleSetVersion": result.rule_set_version,
