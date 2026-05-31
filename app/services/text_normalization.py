@@ -208,10 +208,13 @@ def _collapse_blank_lines(text: str, max_blank_lines: int) -> str:
 
 
 def _remove_separator_lines(text: str) -> str:
-    """Remove lines consisting solely of 5+ repeated separator characters.
+    """Remove lines consisting solely of 5+ non-word characters.
 
-    This is a very conservative OCR artifact cleanup.  Lines with any
-    alphanumeric content are left untouched.
+    This is a very conservative OCR artifact cleanup that targets separator
+    lines (e.g. ``-----`` or ``=====``).  The underlying pattern matches any
+    line made up entirely of 5 or more non-word characters (which may include
+    spaces, mixed punctuation, or symbols); lines with any alphanumeric
+    content are left untouched.
     """
     return _SEPARATOR_LINE_RE.sub("", text)
 
