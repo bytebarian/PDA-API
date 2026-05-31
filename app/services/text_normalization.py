@@ -79,9 +79,6 @@ class TextNormalizationOptions:
     dehyphenate_line_breaks: bool = True
     """Join words split by line-end hyphenation when safe."""
 
-    preserve_page_markers: bool = False
-    """Keep explicit page-break markers in the output."""
-
     max_blank_lines: int = 1
     """Maximum number of consecutive blank lines preserved."""
 
