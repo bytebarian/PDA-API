@@ -255,9 +255,20 @@ def normalize_text(
     if options is None:
         options = TextNormalizationOptions()
 
-    input_char_count = len(text)
-    input_line_count = text.count("\n") + 1 if text else 0
+    if options.max_blank_lines < 0:
+        raise TextNormalizationConfigurationError(
+            f"max_blank_lines must be >= 0, got {options.max_blank_lines}"
+        )
+    if not 0.0 <= warn_removal_ratio <= 1.0:
+        raise TextNormalizationConfigurationError(
+            f"warn_removal_ratio must be between 0 and 1, got {warn_removal_ratio}"
+        )
 
+    input_char_count = len(text)
+    line_count_source = (
+        text.replace("\r\n", "\n").replace("\r", "\n") if text else ""
+    )
+    input_line_count = line_count_source.count("\n") + 1 if line_count_source else 0
     warnings: list[TextNormalizationWarning] = []
     result = text
 
