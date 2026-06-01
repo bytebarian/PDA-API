@@ -36,6 +36,9 @@ def test_document_chunk_has_expected_columns() -> None:
         "metadata_jsonb",
         "embedding",
         "embedding_model",
+        "embedding_provider",
+        "embedding_dimension",
+        "embedding_created_at",
         "created_at",
         "updated_at",
     }
@@ -62,6 +65,7 @@ def test_document_chunk_indexes_defined() -> None:
     index_names = {idx.name for idx in table.indexes}
     assert "ix_document_chunks_document_id" in index_names
     assert "ix_document_chunks_document_id_chunk_index" in index_names
+    assert "ix_document_chunks_embedding_model" in index_names
 
 
 def test_document_chunk_unique_constraint_defined() -> None:
@@ -118,6 +122,19 @@ async def test_document_chunk_embedding_roundtrip(db_session: AsyncSession) -> N
     await db_session.refresh(chunk)
 
     assert chunk.embedding == [0.1, 0.2, 0.3]
+
+
+async def test_document_chunk_metadata_defaults_to_empty_object(db_session: AsyncSession) -> None:
+    document = Document(filename="metadata-default.pdf")
+    db_session.add(document)
+    await db_session.flush()
+
+    chunk = DocumentChunk(document_id=document.id, chunk_index=0, content="chunk")
+    db_session.add(chunk)
+    await db_session.commit()
+    await db_session.refresh(chunk)
+
+    assert chunk.metadata_jsonb == {}
 
 
 async def test_document_chunk_unique_per_document(db_session: AsyncSession) -> None:

@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     embedding_provider: str = "ollama"
     embedding_model: str = "all-minilm"
     embedding_dimensions: int = 1536
+    embedding_distance: str = "cosine"
     embedding_batch_size: int = 16
     embedding_timeout_seconds: int = 60
     embedding_truncate: bool = True
@@ -122,16 +123,13 @@ class Settings(BaseSettings):
             raise ValueError("must be greater than 0")
         return value
 
-    @field_validator("embedding_dimensions")
+    @field_validator("embedding_distance")
     @classmethod
-    def must_match_chunk_vector_dimensions(cls, value: int) -> int:
-        from app.models.document_chunk import EMBEDDING_DIMENSIONS
-
-        if value != EMBEDDING_DIMENSIONS:
-            raise ValueError(
-                f"must equal chunk vector dimensions ({EMBEDDING_DIMENSIONS})"
-            )
-        return value
+    def embedding_distance_must_be_supported(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized != "cosine":
+            raise ValueError("only 'cosine' distance is currently supported")
+        return normalized
 
     model_config = SettingsConfigDict(
         env_prefix="PDA_",

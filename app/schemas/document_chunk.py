@@ -22,6 +22,9 @@ class DocumentChunkBase(BaseModel):
     metadata_jsonb: dict[str, Any] | None = None
     embedding: list[float] | None = None
     embedding_model: str | None = None
+    embedding_provider: str | None = None
+    embedding_dimension: int | None = None
+    embedding_created_at: datetime | None = None
 
 
 class DocumentChunkCreate(DocumentChunkBase):
@@ -40,6 +43,9 @@ class DocumentChunkUpdate(BaseModel):
     metadata_jsonb: dict[str, Any] | None = None
     embedding: list[float] | None = None
     embedding_model: str | None = None
+    embedding_provider: str | None = None
+    embedding_dimension: int | None = None
+    embedding_created_at: datetime | None = None
 
 
 class DocumentChunkRead(DocumentChunkBase):

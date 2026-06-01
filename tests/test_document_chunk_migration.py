@@ -31,6 +31,9 @@ def test_document_chunk_migration_upgrade_and_downgrade_sqlite(
         assert "document_chunks" in inspector.get_table_names()
         column_names = {column["name"] for column in inspector.get_columns("document_chunks")}
         assert "embedding" in column_names
+        assert "embedding_provider" in column_names
+        assert "embedding_dimension" in column_names
+        assert "embedding_created_at" in column_names
 
         command.downgrade(config, "1b8bb4d20971")
 
