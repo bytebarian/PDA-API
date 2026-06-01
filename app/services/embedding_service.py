@@ -174,13 +174,24 @@ class EmbeddingService:
                 "Provider returned no model name; cannot determine authoritative embedding model"
             )
 
+        # Validate every vector before mutating any chunk so a validation
+        # failure never leaves partial vectors in the session.
+        validated_updates: list[tuple[DocumentChunk, list[float], str]] = [
+            (
+                chunk,
+                validate_embedding_vector(
+                    vector,
+                    expected_dimensions=runtime.dimensions,
+                ),
+                model_name,
+            )
+            for chunk, vector, model_name in pending_updates
+        ]
+
         # Apply mutations atomically only after all batches have been fetched
         # and validated, so a failed embedding run never leaves partial vectors.
-        for chunk, vector, model_name in pending_updates:
-            chunk.embedding = validate_embedding_vector(
-                vector,
-                expected_dimensions=runtime.dimensions,
-            )
+        for chunk, vector, model_name in validated_updates:
+            chunk.embedding = vector
             chunk.embedding_model = model_name
             chunk.embedding_provider = runtime.provider
             chunk.embedding_dimension = runtime.dimensions
