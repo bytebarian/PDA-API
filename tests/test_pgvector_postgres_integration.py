@@ -7,6 +7,7 @@ from alembic import command
 from alembic.config import Config
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 
 from app.core.config import get_settings
 
@@ -27,7 +28,7 @@ def test_pgvector_extension_available_after_migrations(monkeypatch: pytest.Monke
     alembic_ini = Path(__file__).resolve().parents[1] / "alembic.ini"
     command.upgrade(Config(str(alembic_ini)), "head")
 
-    sync_url = postgres_url.replace("+asyncpg", "")
+    sync_url = make_url(postgres_url).set(drivername="postgresql")
     engine = create_engine(sync_url)
     try:
         with engine.connect() as connection:

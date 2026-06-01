@@ -38,6 +38,18 @@ def upgrade() -> None:
         "document_chunks",
         sa.Column("embedding_created_at", sa.DateTime(timezone=True), nullable=True),
     )
+
+    if is_postgres:
+        op.execute(
+            "UPDATE document_chunks SET embedding_dimension = vector_dims(embedding) "
+            "WHERE embedding IS NOT NULL AND embedding_dimension IS NULL"
+        )
+    else:
+        op.execute(
+            "UPDATE document_chunks SET embedding_dimension = json_array_length(embedding) "
+            "WHERE embedding IS NOT NULL AND embedding_dimension IS NULL"
+        )
+
     op.create_index(
         "ix_document_chunks_embedding_model",
         "document_chunks",

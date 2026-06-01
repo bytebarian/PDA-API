@@ -24,6 +24,7 @@ def _cosine_distance(left: list[float], right: list[float]) -> float:
     if left_norm == 0 or right_norm == 0:
         return 1.0
     cosine_similarity = dot_product / (left_norm * right_norm)
+    cosine_similarity = max(-1.0, min(1.0, cosine_similarity))
     return 1.0 - cosine_similarity
 
 
@@ -94,11 +95,15 @@ class VectorSearchRepository:
         metadata_filter: dict[str, Any] | None,
     ) -> list[SimilarityResult]:
         distance_expr = DocumentChunk.embedding.cosine_distance(query_embedding)
-        statement = self._base_statement(
-            document_ids=document_ids,
-            embedding_model=embedding_model,
-            metadata_filter=metadata_filter,
-        ).add_columns(distance_expr.label("distance"))
+        statement = (
+            self._base_statement(
+                document_ids=document_ids,
+                embedding_model=embedding_model,
+                metadata_filter=metadata_filter,
+            )
+            .where(DocumentChunk.embedding_dimension == len(query_embedding))
+            .add_columns(distance_expr.label("distance"))
+        )
         if min_similarity is not None:
             statement = statement.where(distance_expr <= (1.0 - min_similarity))
         statement = statement.order_by(distance_expr.asc()).limit(limit)

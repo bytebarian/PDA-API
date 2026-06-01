@@ -245,9 +245,8 @@ async def replace_document_chunks(
     )
 
     for chunk in chunks:
-        metadata: dict[str, Any] | None = chunk.metadata
+        metadata: dict[str, Any] = dict(chunk.metadata or {})
         if chunk.source_section is not None:
-            metadata = dict(metadata or {})
             metadata["source_section"] = chunk.source_section
 
         db.add(
