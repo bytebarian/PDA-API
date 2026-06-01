@@ -176,7 +176,7 @@ class EmbeddingService:
 
         # Validate every vector before mutating any chunk so a validation
         # failure never leaves partial vectors in the session.
-        validated_updates: list[tuple[DocumentChunk, list[float], str]] = [
+        chunks_with_validated_vectors: list[tuple[DocumentChunk, list[float], str]] = [
             (
                 chunk,
                 validate_embedding_vector(
@@ -190,7 +190,7 @@ class EmbeddingService:
 
         # Apply mutations atomically only after all batches have been fetched
         # and validated, so a failed embedding run never leaves partial vectors.
-        for chunk, vector, model_name in validated_updates:
+        for chunk, vector, model_name in chunks_with_validated_vectors:
             chunk.embedding = vector
             chunk.embedding_model = model_name
             chunk.embedding_provider = runtime.provider
