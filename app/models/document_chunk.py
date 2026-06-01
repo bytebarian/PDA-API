@@ -18,6 +18,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
     func,
+    text,
 )
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -50,10 +51,11 @@ class DocumentChunk(Base):
     page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     source_start_offset: Mapped[int | None] = mapped_column(Integer, nullable=True)
     source_end_offset: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    metadata_jsonb: Mapped[dict[str, Any] | None] = mapped_column(
+    metadata_jsonb: Mapped[dict[str, Any]] = mapped_column(
         JSON().with_variant(postgresql.JSONB(), "postgresql"),
         nullable=False,
         default=dict,
+        server_default=text("'{}'"),
     )
     embedding: Mapped[list[float] | None] = mapped_column(
         Vector().with_variant(JSON(), "sqlite"),
