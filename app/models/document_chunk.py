@@ -21,7 +21,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.db.base import Base
 
@@ -81,6 +81,18 @@ class DocumentChunk(Base):
     )
 
     document: Mapped[Document] = relationship(back_populates="chunks")
+
+    @validates("metadata_jsonb")
+    def _coerce_metadata_jsonb(
+        self, _key: str, value: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        """Normalize ``None`` to an empty object so NOT NULL inserts succeed.
+
+        Call-sites may pass ``metadata_jsonb=None`` explicitly, which bypasses
+        the column ``default`` and would violate the NOT NULL constraint
+        (notably on PostgreSQL).
+        """
+        return {} if value is None else value
 
     __table_args__ = (
         UniqueConstraint(
