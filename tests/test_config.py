@@ -21,6 +21,7 @@ def test_settings_defaults() -> None:
     assert settings.embedding_provider == "ollama"
     assert settings.embedding_model == "all-minilm"
     assert settings.embedding_dimensions == 1536
+    assert settings.embedding_distance == "cosine"
     assert settings.embedding_batch_size == 16
     assert settings.embedding_timeout_seconds == 60
     assert settings.embedding_truncate is True
@@ -50,8 +51,11 @@ def test_invalid_settings_fail_clearly() -> None:
         Settings(max_file_size_bytes=0)
 
 
-def test_embedding_dimensions_must_match_chunk_vector_dimensions() -> None:
-    from app.models.document_chunk import EMBEDDING_DIMENSIONS
-
+def test_embedding_dimensions_must_be_positive() -> None:
     with pytest.raises(ValidationError, match="embedding_dimensions"):
-        Settings(embedding_dimensions=EMBEDDING_DIMENSIONS + 1)
+        Settings(embedding_dimensions=0)
+
+
+def test_embedding_distance_must_be_cosine() -> None:
+    with pytest.raises(ValidationError, match="embedding_distance"):
+        Settings(embedding_distance="euclidean")

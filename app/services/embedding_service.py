@@ -5,6 +5,8 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import logging
+import time
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,8 +21,11 @@ from app.adapters.embeddings import (
 from app.core.config import Settings, get_settings
 from app.models.app_settings import AppSettings
 from app.models.document import Document
-from app.models.document_chunk import DocumentChunk, EMBEDDING_DIMENSIONS
+from app.models.document_chunk import DocumentChunk
 from app.models.processing_job import ProcessingJob
+from app.services.vector_validation import validate_embedding_vector
+
+logger = logging.getLogger(__name__)
 
 
 class EmbeddingServiceError(RuntimeError):
@@ -97,6 +102,7 @@ class EmbeddingService:
         dimensions: int | None = None,
         batch_size: int | None = None,
     ) -> EmbeddingGenerationResult:
+        started = time.perf_counter()
         document = await self._db.get(Document, document_id)
         if document is None:
             raise DocumentNotFoundError(f"Document not found: {document_id}")
@@ -171,12 +177,29 @@ class EmbeddingService:
         # Apply mutations atomically only after all batches have been fetched
         # and validated, so a failed embedding run never leaves partial vectors.
         for chunk, vector, model_name in pending_updates:
-            chunk.embedding = vector
+            chunk.embedding = validate_embedding_vector(
+                vector,
+                expected_dimensions=runtime.dimensions,
+            )
             chunk.embedding_model = model_name
+            chunk.embedding_provider = runtime.provider
+            chunk.embedding_dimension = runtime.dimensions
+            chunk.embedding_created_at = _utcnow()
         embedded_count = len(pending_updates)
         document.embedding_model = actual_model
         document.chunk_count = len(chunks)
         document.last_indexed_at = _utcnow()
+        duration_ms = round((time.perf_counter() - started) * 1000, 2)
+        logger.info(
+            "Document embeddings persisted",
+            extra={
+                "document_id": str(document.id),
+                "chunk_count": len(chunks),
+                "embedding_model": actual_model,
+                "embedding_dimension": runtime.dimensions,
+                "duration_ms": duration_ms,
+            },
+        )
 
         return EmbeddingGenerationResult(
             document_id=document.id,
@@ -215,10 +238,6 @@ class EmbeddingService:
             resolved_dimensions = self._settings.embedding_dimensions
         if resolved_dimensions <= 0:
             raise EmbeddingDimensionMismatchError("Embedding dimensions must be greater than 0")
-        if resolved_dimensions != EMBEDDING_DIMENSIONS:
-            raise EmbeddingDimensionMismatchError(
-                f"Configured embedding dimensions {resolved_dimensions} do not match chunk vector dimensions {EMBEDDING_DIMENSIONS}"
-            )
 
         resolved_batch_size = batch_size if batch_size is not None else self._settings.embedding_batch_size
         if resolved_batch_size <= 0:

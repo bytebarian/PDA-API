@@ -28,9 +28,6 @@ if TYPE_CHECKING:
     from app.models.document import Document
 
 
-EMBEDDING_DIMENSIONS = 1536
-
-
 class DocumentChunk(Base):
     """Persistence model for a chunk extracted from a document."""
 
@@ -55,13 +52,20 @@ class DocumentChunk(Base):
     source_end_offset: Mapped[int | None] = mapped_column(Integer, nullable=True)
     metadata_jsonb: Mapped[dict[str, Any] | None] = mapped_column(
         JSON().with_variant(postgresql.JSONB(), "postgresql"),
-        nullable=True,
+        nullable=False,
+        default=dict,
     )
     embedding: Mapped[list[float] | None] = mapped_column(
-        Vector(EMBEDDING_DIMENSIONS).with_variant(JSON(), "sqlite"),
+        Vector().with_variant(JSON(), "sqlite"),
         nullable=True,
     )
     embedding_model: Mapped[str | None] = mapped_column(String, nullable=True)
+    embedding_provider: Mapped[str | None] = mapped_column(String, nullable=True)
+    embedding_dimension: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    embedding_created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -87,4 +91,5 @@ class DocumentChunk(Base):
             "document_id",
             "chunk_index",
         ),
+        Index("ix_document_chunks_embedding_model", "embedding_model"),
     )

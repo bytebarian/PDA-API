@@ -56,6 +56,9 @@ async def test_embeddings_stage_persists_vectors_and_updates_metadata(
     assert chunks
     assert all(chunk.embedding is not None for chunk in chunks)
     assert all(len(chunk.embedding or []) == 1536 for chunk in chunks)
+    assert all(chunk.embedding_provider == "fake" for chunk in chunks)
+    assert all(chunk.embedding_dimension == 1536 for chunk in chunks)
+    assert all(chunk.embedding_created_at is not None for chunk in chunks)
     assert refreshed.embedding_model == "fake-embed-model"
     assert refreshed.chunk_count == len(chunks)
     assert refreshed.last_indexed_at is not None

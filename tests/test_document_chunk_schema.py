@@ -36,6 +36,9 @@ def test_document_chunk_base_defaults() -> None:
     assert payload.metadata_jsonb is None
     assert payload.embedding is None
     assert payload.embedding_model is None
+    assert payload.embedding_provider is None
+    assert payload.embedding_dimension is None
+    assert payload.embedding_created_at is None
 
 
 def test_document_chunk_create_inherits_base_defaults() -> None:
