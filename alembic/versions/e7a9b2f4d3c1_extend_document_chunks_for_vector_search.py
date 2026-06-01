@@ -45,12 +45,13 @@ def upgrade() -> None:
     )
 
     op.execute("UPDATE document_chunks SET metadata_jsonb = '{}' WHERE metadata_jsonb IS NULL")
-    op.alter_column(
-        "document_chunks",
-        "metadata_jsonb",
-        server_default=sa.text("'{}'"),
-        nullable=False,
-    )
+    if is_postgres:
+        op.alter_column(
+            "document_chunks",
+            "metadata_jsonb",
+            server_default=sa.text("'{}'"),
+            nullable=False,
+        )
 
     if is_postgres:
         op.execute("ALTER TABLE document_chunks ALTER COLUMN embedding TYPE vector")
@@ -75,12 +76,13 @@ def downgrade() -> None:
         op.execute("DROP INDEX IF EXISTS ix_document_chunks_embedding_ivfflat")
         op.execute("ALTER TABLE document_chunks ALTER COLUMN embedding TYPE vector(1536)")
 
-    op.alter_column(
-        "document_chunks",
-        "metadata_jsonb",
-        server_default=None,
-        nullable=True,
-    )
+    if is_postgres:
+        op.alter_column(
+            "document_chunks",
+            "metadata_jsonb",
+            server_default=None,
+            nullable=True,
+        )
     op.drop_index("ix_document_chunks_embedding_model", table_name="document_chunks")
     op.drop_column("document_chunks", "embedding_created_at")
     op.drop_column("document_chunks", "embedding_dimension")

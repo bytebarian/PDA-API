@@ -69,7 +69,7 @@ class VectorSearchRepository:
         document_ids: list[uuid.UUID] | None,
         embedding_model: str | None,
         metadata_filter: dict[str, Any] | None,
-    ) -> Select[tuple[DocumentChunk, str | None]]:
+    ) -> Select[tuple[DocumentChunk, str]]:
         statement = (
             select(DocumentChunk, Document.filename)
             .join(Document, Document.id == DocumentChunk.document_id)
