@@ -62,7 +62,9 @@ class SearchFilters(BaseModel):
             return None
         if not isinstance(value, list):
             return value
-        normalized = [item.strip() for item in value if isinstance(item, str) and item.strip()]
+        if any(not isinstance(item, str) for item in value):
+            raise ValueError("must be a list of strings")
+        normalized = [item.strip() for item in value if item.strip()]
         return normalized or None
 
     @field_validator("filename_contains")
