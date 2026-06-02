@@ -17,7 +17,11 @@ from app.services.vector_validation import similarity_from_cosine_distance
 MAX_SEARCH_LIMIT = 50
 
 
-def _cosine_distance(left: list[float], right: list[float]) -> float:
+def bounded_search_limit(limit: int) -> int:
+    return min(max(limit, 1), MAX_SEARCH_LIMIT)
+
+
+def cosine_distance(left: list[float], right: list[float]) -> float:
     dot_product = sum(a * b for a, b in zip(left, right, strict=True))
     left_norm = math.sqrt(sum(value * value for value in left))
     right_norm = math.sqrt(sum(value * value for value in right))
@@ -26,6 +30,36 @@ def _cosine_distance(left: list[float], right: list[float]) -> float:
     cosine_similarity = dot_product / (left_norm * right_norm)
     cosine_similarity = max(-1.0, min(1.0, cosine_similarity))
     return 1.0 - cosine_similarity
+
+
+def build_chunk_document_statement(
+    *,
+    document_columns: tuple[Any, ...],
+    document_ids: list[uuid.UUID] | None,
+    embedding_model: str | None,
+    metadata_filter: dict[str, Any] | None = None,
+    categories: list[str] | None = None,
+    file_types: list[str] | None = None,
+    document_status: str | None = None,
+) -> Select[Any]:
+    statement = (
+        select(DocumentChunk, *document_columns)
+        .join(Document, Document.id == DocumentChunk.document_id)
+        .where(DocumentChunk.embedding.is_not(None))
+    )
+    if document_status is not None:
+        statement = statement.where(Document.status == document_status)
+    if document_ids:
+        statement = statement.where(DocumentChunk.document_id.in_(document_ids))
+    if categories:
+        statement = statement.where(Document.category.in_(categories))
+    if file_types:
+        statement = statement.where(Document.file_type.in_(file_types))
+    if embedding_model:
+        statement = statement.where(DocumentChunk.embedding_model == embedding_model)
+    if metadata_filter:
+        statement = statement.where(DocumentChunk.metadata_jsonb.contains(metadata_filter))
+    return statement
 
 
 class VectorSearchRepository:
@@ -42,7 +76,7 @@ class VectorSearchRepository:
         embedding_model: str | None = None,
         metadata_filter: dict[str, Any] | None = None,
     ) -> list[SimilarityResult]:
-        bounded_limit = min(max(limit, 1), MAX_SEARCH_LIMIT)
+        bounded_limit = bounded_search_limit(limit)
         if self._db.bind is None:
             raise RuntimeError("Database session is not bound to an engine")
         dialect = self._db.bind.dialect.name
@@ -71,18 +105,12 @@ class VectorSearchRepository:
         embedding_model: str | None,
         metadata_filter: dict[str, Any] | None,
     ) -> Select[tuple[DocumentChunk, str]]:
-        statement = (
-            select(DocumentChunk, Document.filename)
-            .join(Document, Document.id == DocumentChunk.document_id)
-            .where(DocumentChunk.embedding.is_not(None))
+        return build_chunk_document_statement(
+            document_columns=(Document.filename,),
+            document_ids=document_ids,
+            embedding_model=embedding_model,
+            metadata_filter=metadata_filter,
         )
-        if document_ids:
-            statement = statement.where(DocumentChunk.document_id.in_(document_ids))
-        if embedding_model:
-            statement = statement.where(DocumentChunk.embedding_model == embedding_model)
-        if metadata_filter:
-            statement = statement.where(DocumentChunk.metadata_jsonb.contains(metadata_filter))
-        return statement
 
     async def _search_postgres(
         self,
@@ -104,7 +132,7 @@ class VectorSearchRepository:
             .where(DocumentChunk.embedding_dimension == len(query_embedding))
             .add_columns(distance_expr.label("distance"))
         )
-        if min_similarity is not None:
+        if min_similarity is not None and min_similarity > 0.0:
             statement = statement.where(distance_expr <= (1.0 - min_similarity))
         statement = statement.order_by(distance_expr.asc()).limit(limit)
 
@@ -150,7 +178,7 @@ class VectorSearchRepository:
             embedding = chunk.embedding
             if embedding is None or len(embedding) != len(query_embedding):
                 continue
-            distance = _cosine_distance(list(embedding), query_embedding)
+            distance = cosine_distance(list(embedding), query_embedding)
             similarity = similarity_from_cosine_distance(distance)
             if min_similarity is not None and similarity < min_similarity:
                 continue

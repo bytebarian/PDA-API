@@ -2,40 +2,31 @@
 
 from __future__ import annotations
 
-import math
 import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.status import DocumentStatus
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
-
-MAX_SEARCH_LIMIT = 50
-
-
-def _cosine_distance(left: list[float], right: list[float]) -> float:
-    """Compute cosine distance in [0, 2] between two equal-length vectors."""
-    dot_product = sum(a * b for a, b in zip(left, right, strict=True))
-    left_norm = math.sqrt(sum(v * v for v in left))
-    right_norm = math.sqrt(sum(v * v for v in right))
-    if left_norm == 0 or right_norm == 0:
-        return 1.0
-    cosine_similarity = dot_product / (left_norm * right_norm)
-    cosine_similarity = max(-1.0, min(1.0, cosine_similarity))
-    return 1.0 - cosine_similarity
+from app.repositories.vector_search_repository import (
+    bounded_search_limit,
+    build_chunk_document_statement,
+    cosine_distance,
+)
+from app.services.vector_validation import similarity_from_cosine_distance
 
 
 def score_from_distance(distance: float) -> float:
     """Map cosine distance [0, 2] to a stable score in [0, 1].
 
-    Uses the formula ``max(0, 1 - distance / 2)`` so the returned value is
+    Uses the formula ``max(0, 1 - distance)`` so the returned value is
     always non-negative and reaches 1.0 for identical vectors.
     """
-    return max(0.0, 1.0 - distance / 2.0)
+    return similarity_from_cosine_distance(distance)
 
 
 @dataclass
@@ -82,7 +73,7 @@ class ChunkRepository:
         ordered by ascending cosine distance (most similar first), with
         ``chunk_index`` as a stable tie-breaker.
         """
-        bounded_limit = min(max(limit, 1), MAX_SEARCH_LIMIT)
+        bounded_limit = bounded_search_limit(limit)
         if self._db.bind is None:
             raise RuntimeError("Database session is not bound to an engine")
         dialect = self._db.bind.dialect.name
@@ -118,21 +109,14 @@ class ChunkRepository:
         file_types: list[str] | None,
         embedding_model: str | None,
     ) -> Select[tuple[DocumentChunk, Document]]:
-        statement = (
-            select(DocumentChunk, Document)
-            .join(Document, Document.id == DocumentChunk.document_id)
-            .where(Document.status == DocumentStatus.ready.value)
-            .where(DocumentChunk.embedding.is_not(None))
+        return build_chunk_document_statement(
+            document_columns=(Document,),
+            document_ids=document_ids,
+            categories=categories,
+            file_types=file_types,
+            document_status=DocumentStatus.ready.value,
+            embedding_model=embedding_model,
         )
-        if document_ids:
-            statement = statement.where(DocumentChunk.document_id.in_(document_ids))
-        if categories:
-            statement = statement.where(Document.category.in_(categories))
-        if file_types:
-            statement = statement.where(Document.file_type.in_(file_types))
-        if embedding_model:
-            statement = statement.where(DocumentChunk.embedding_model == embedding_model)
-        return statement
 
     async def _search_postgres(
         self,
@@ -156,10 +140,10 @@ class ChunkRepository:
             .where(DocumentChunk.embedding_dimension == len(query_embedding))
             .add_columns(distance_expr.label("distance"))
         )
-        if min_score is not None:
-            # score = max(0, 1 - distance / 2) >= min_score
-            # ⟹ distance <= 2 * (1 - min_score)
-            statement = statement.where(distance_expr <= 2.0 * (1.0 - min_score))
+        if min_score is not None and min_score > 0.0:
+            # score = max(0, 1 - distance) >= min_score
+            # ⟹ distance <= 1 - min_score
+            statement = statement.where(distance_expr <= (1.0 - min_score))
         statement = (
             statement.order_by(distance_expr.asc(), DocumentChunk.chunk_index.asc())
             .limit(limit)
@@ -213,7 +197,7 @@ class ChunkRepository:
             embedding = chunk.embedding
             if embedding is None or len(embedding) != len(query_embedding):
                 continue
-            distance = _cosine_distance(list(embedding), query_embedding)
+            distance = cosine_distance(list(embedding), query_embedding)
             score = score_from_distance(distance)
             if min_score is not None and score < min_score:
                 continue

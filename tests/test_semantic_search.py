@@ -179,8 +179,8 @@ def test_score_from_distance_two_is_zero() -> None:
     assert score_from_distance(2.0) == 0.0
 
 
-def test_score_from_distance_one_is_half() -> None:
-    assert score_from_distance(1.0) == pytest.approx(0.5)
+def test_score_from_distance_one_is_zero() -> None:
+    assert score_from_distance(1.0) == 0.0
 
 
 def test_score_from_distance_never_negative() -> None:
@@ -352,7 +352,7 @@ async def test_chunk_repository_min_score_filter(db_session: AsyncSession) -> No
     await _seed_chunk(
         db_session, doc.id, chunk_index=0, content="exact match", embedding=[1.0, 0.0, 0.0, 0.0]
     )
-    # Orthogonal – score ~0.5
+    # Orthogonal – score 0.0
     await _seed_chunk(
         db_session, doc.id, chunk_index=1, content="orthogonal", embedding=[0.0, 1.0, 0.0, 0.0]
     )
@@ -537,7 +537,7 @@ async def test_service_min_score_filters_low_quality_results(
     # Use hand-crafted vectors to get known distances
     query_emb = [1.0, 0.0, 0.0, 0.0]
     high_emb = [1.0, 0.0, 0.0, 0.0]   # distance ≈ 0  → score ≈ 1.0
-    low_emb = [0.0, 1.0, 0.0, 0.0]    # distance ≈ 1  → score ≈ 0.5
+    low_emb = [0.0, 1.0, 0.0, 0.0]    # distance ≈ 1  → score ≈ 0.0
 
     await _seed_chunk(
         db_session, doc.id, chunk_index=0, content="high score",
