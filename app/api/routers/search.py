@@ -7,13 +7,16 @@ Exposes:
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.embeddings import EmbeddingProvider
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.schemas.search import SemanticSearchRequest, SemanticSearchResponse
+from app.services.embedding_service import build_embedding_providers
 from app.services.search_service import (
     EmbeddingProviderNotAvailableError,
     SearchConfigurationError,
@@ -23,6 +26,49 @@ from app.services.search_service import (
 
 router = APIRouter(prefix="/search", tags=["search"])
 logger = logging.getLogger(__name__)
+_PROVIDER_CACHE: dict[tuple[Any, ...], dict[str, EmbeddingProvider]] = {}
+
+
+def _provider_cache_key(settings: Settings) -> tuple[Any, ...]:
+    return (
+        settings.ollama_base_url,
+        settings.embedding_timeout_seconds,
+    )
+
+
+def _get_shared_providers(settings: Settings) -> dict[str, EmbeddingProvider]:
+    cache_key = _provider_cache_key(settings)
+    providers = _PROVIDER_CACHE.get(cache_key)
+    if providers is None:
+        providers = build_embedding_providers(settings)
+        _PROVIDER_CACHE[cache_key] = providers
+    return providers
+
+
+async def close_search_providers() -> None:
+    for providers in _PROVIDER_CACHE.values():
+        for provider in providers.values():
+            close = getattr(provider, "aclose", None)
+            if callable(close):
+                try:
+                    await close()
+                except Exception:
+                    logger.debug(
+                        "Failed to close embedding provider cleanly",
+                        exc_info=True,
+                    )
+    _PROVIDER_CACHE.clear()
+
+
+def get_search_service(
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> SearchService:
+    return SearchService(
+        db,
+        providers=_get_shared_providers(settings),
+        settings=settings,
+    )
 
 
 @router.post(
@@ -37,11 +83,9 @@ logger = logging.getLogger(__name__)
 )
 async def semantic_search(
     request: SemanticSearchRequest,
-    db: AsyncSession = Depends(get_db),
-    settings: Settings = Depends(get_settings),
+    service: SearchService = Depends(get_search_service),
 ) -> SemanticSearchResponse:
     """Run semantic search and return ranked chunk results."""
-    service = SearchService(db, settings=settings)
     try:
         return await service.semantic_search(request)
     except EmbeddingProviderNotAvailableError as exc:

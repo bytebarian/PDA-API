@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from app.adapters.embeddings import (
+    EmbeddingResult,
     EmbeddingProviderUnavailableError,
     FakeEmbeddingProvider,
 )
@@ -842,6 +843,57 @@ def test_api_semantic_search_provider_unavailable_returns_503(
         assert resp.status_code == 503
     finally:
         SearchService.__init__ = original_service_init  # type: ignore[method-assign]
+        fastapi_app.dependency_overrides.clear()
+
+
+def test_api_semantic_search_reuses_provider_and_closes_on_shutdown(
+    tmp_path: Path, api_db: AsyncSession
+) -> None:
+    from app.api import routers
+
+    provider = MagicMock()
+    provider.name = "fake"
+    provider.embed_texts = AsyncMock(
+        return_value=[
+            EmbeddingResult(
+                text_index=0,
+                vector=[1.0, 0.0, 0.0, 0.0],
+                model="test-model",
+                dimensions=_DIM,
+            )
+        ]
+    )
+    provider.aclose = AsyncMock()
+
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        yield api_db
+
+    routers.search._PROVIDER_CACHE.clear()
+    fastapi_app.dependency_overrides[get_db] = override_get_db
+    fastapi_app.dependency_overrides[get_settings] = lambda: Settings(
+        storage_path=tmp_path,  # type: ignore[arg-type]
+        embedding_provider="fake",
+        embedding_model="test-model",
+        embedding_dimensions=_DIM,
+        _env_file=None,  # type: ignore[call-arg]
+    )
+
+    original_build = routers.search.build_embedding_providers
+    routers.search.build_embedding_providers = lambda _settings: {"fake": provider}
+
+    try:
+        with TestClient(fastapi_app) as c:
+            first = c.post("/search/semantic", json={"query": "hello"})
+            second = c.post("/search/semantic", json={"query": "world"})
+            assert first.status_code == 200
+            assert second.status_code == 200
+            assert provider.aclose.await_count == 0
+
+        assert provider.embed_texts.await_count == 2
+        assert provider.aclose.await_count == 1
+    finally:
+        routers.search.build_embedding_providers = original_build
+        routers.search._PROVIDER_CACHE.clear()
         fastapi_app.dependency_overrides.clear()
 
 
