@@ -89,8 +89,10 @@ class DocumentSummary(BaseModel):
     summary_generated_at: datetime | None
     category_status: str | None = Field(serialization_alias="categoryStatus")
     category_source: str | None = Field(serialization_alias="categorySource")
-    category_confidence: float | None
-    category_generated_at: datetime | None
+    category_confidence: float | None = Field(serialization_alias="categoryConfidence")
+    category_generated_at: datetime | None = Field(
+        serialization_alias="categoryGeneratedAt"
+    )
     created_at: datetime
     updated_at: datetime
 
@@ -129,11 +131,13 @@ class DocumentDetail(BaseModel):
     summary_error: str | None
     category_status: str | None = Field(serialization_alias="categoryStatus")
     category_source: str | None = Field(serialization_alias="categorySource")
-    category_confidence: float | None
-    category_reason: str | None
-    category_model: str | None
-    category_generated_at: datetime | None
-    category_error: str | None
+    category_confidence: float | None = Field(serialization_alias="categoryConfidence")
+    category_reason: str | None = Field(serialization_alias="categoryReason")
+    category_model: str | None = Field(serialization_alias="categoryModel")
+    category_generated_at: datetime | None = Field(
+        serialization_alias="categoryGeneratedAt"
+    )
+    category_error: str | None = Field(serialization_alias="categoryError")
     chunk_count: int
     embedding_model: str | None
     last_indexed_at: datetime | None

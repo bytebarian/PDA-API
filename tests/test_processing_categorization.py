@@ -389,7 +389,7 @@ async def test_document_list_exposes_category_fields(
     assert item["category"] == "invoice"
     assert item["categoryStatus"] == "ready"
     assert item["categorySource"] == "rules"
-    assert item["category_confidence"] == pytest.approx(0.87, abs=1e-4)
+    assert item["categoryConfidence"] == pytest.approx(0.87, abs=1e-4)
 
 
 async def test_document_detail_exposes_category_fields(
@@ -416,10 +416,10 @@ async def test_document_detail_exposes_category_fields(
     assert body["category"] == "contract"
     assert body["categoryStatus"] == "ready"
     assert body["categorySource"] == "rules"
-    assert body["category_confidence"] == pytest.approx(0.75, abs=1e-4)
-    assert body["category_reason"] is not None
-    assert "category_generated_at" in body
-    assert "category_error" in body
+    assert body["categoryConfidence"] == pytest.approx(0.75, abs=1e-4)
+    assert body["categoryReason"] is not None
+    assert "categoryGeneratedAt" in body
+    assert "categoryError" in body
 
 
 # ---------------------------------------------------------------------------
