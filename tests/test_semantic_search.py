@@ -207,7 +207,8 @@ def test_excerpt_long_text_truncated_at_word_boundary() -> None:
     result = _make_excerpt(text, max_chars=300)
     assert len(result) <= 301  # 300 chars + ellipsis char
     assert result.endswith("…")
-    # Must end on a word boundary (space before ellipsis)
+    # The character immediately before the ellipsis must not be a space
+    # (no trailing space left after trimming at the word boundary).
     assert result[-2] != " "
 
 
