@@ -26,7 +26,6 @@ class SemanticSearchResult(BaseModel):
     chunk_id: uuid.UUID
     document_id: uuid.UUID
     document_name: str
-    document_path: str | None = None
     category: str | None = None
     file_type: str | None = None
     page_number: int | None = None

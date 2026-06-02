@@ -688,7 +688,7 @@ async def test_service_response_includes_citation_metadata(db_session: AsyncSess
     assert response.result_count == 1
     r = response.results[0]
     assert r.document_name == "contract.pdf"
-    assert r.document_path == "/docs/contract.pdf"
+    assert "document_path" not in r.model_dump()
     assert r.category == "contract"
     assert r.file_type == "pdf"
     assert r.page_number == 3

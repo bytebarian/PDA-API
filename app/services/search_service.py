@@ -192,7 +192,6 @@ class SearchService:
                     chunk_id=row.chunk_id,
                     document_id=row.document_id,
                     document_name=row.document_name,
-                    document_path=row.document_path,
                     category=row.category,
                     file_type=row.file_type,
                     page_number=row.page_number,
