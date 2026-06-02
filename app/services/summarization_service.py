@@ -226,6 +226,8 @@ async def summarize_document(
             error_reason,
         )
         document.summary_status = _SUMMARY_STATUS_FAILED
+        document.summary = None
+        document.summary_model = model
         document.summary_error = error_reason
         document.summary_generated_at = _utcnow()
         return DocumentSummaryResult(
