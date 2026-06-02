@@ -173,16 +173,14 @@ class ChunkRepository:
         file_types: list[str] | None,
         embedding_model: str | None,
     ) -> list[ChunkSearchRow]:
-        rows = (
-            await self._db.execute(
-                self._base_statement(
-                    document_ids=document_ids,
-                    categories=categories,
-                    file_types=file_types,
-                    embedding_model=embedding_model,
-                )
-            )
-        ).all()
+        statement = self._base_statement(
+            document_ids=document_ids,
+            categories=categories,
+            file_types=file_types,
+            embedding_model=embedding_model,
+        ).where(DocumentChunk.embedding_dimension == len(query_embedding))
+
+        rows = (await self._db.execute(statement)).all()
 
         scored: list[ChunkSearchRow] = []
         for chunk, doc in rows:
