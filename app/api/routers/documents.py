@@ -293,12 +293,18 @@ async def update_document(
             )
 
         # Manual category assignment should override any provider-generated metadata.
-        document.category_source = CategorizationSource.manual.value
-        document.category_status = "ready" if category is not None else "pending"
+        if category is not None:
+            document.category_source = CategorizationSource.manual.value
+            document.category_status = "ready"
+            document.category_generated_at = datetime.now(timezone.utc)
+        else:
+            # Clearing category should re-enable automatic categorization on next run.
+            document.category_source = None
+            document.category_status = "pending"
+            document.category_generated_at = None
         document.category_confidence = None
         document.category_reason = None
         document.category_model = None
-        document.category_generated_at = datetime.now(timezone.utc) if category is not None else None
         document.category_error = None
     await db.commit()
     return await get_document(document.id, db)
