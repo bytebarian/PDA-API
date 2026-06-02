@@ -131,9 +131,14 @@ class SearchService:
                 f"Embedding provider returned an error: {exc}"
             ) from exc
 
-        query_vector = embed_results[0].vector
-        actual_model: str = embed_results[0].model or runtime.model
+        from app.services.vector_validation import validate_embedding_vector
 
+        query_vector = validate_embedding_vector(
+            embed_results[0].vector,
+            expected_dimensions=runtime.dimensions,
+            field_name="query_embedding",
+        )
+        actual_model: str = embed_results[0].model or runtime.model
         rows = await self._repository.semantic_search(
             query_vector,
             limit=request.top_k,
