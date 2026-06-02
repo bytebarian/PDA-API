@@ -108,6 +108,8 @@ class SearchFilters(BaseModel):
                 raise ValueError(
                     f"metadata value for '{key}' exceeds {_MAX_METADATA_VALUE_LENGTH} characters"
                 )
+            if key in normalized:
+                raise ValueError(f"duplicate metadata key after normalization: '{key}'")
             normalized[key] = item
         return normalized or None
 
