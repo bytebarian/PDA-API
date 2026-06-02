@@ -84,6 +84,7 @@ class SearchService:
     ) -> None:
         self._db = db
         self._settings = settings or get_settings()
+        self._owns_providers = providers is None
         self._providers = (
             providers if providers is not None else _build_providers(self._settings)
         )
