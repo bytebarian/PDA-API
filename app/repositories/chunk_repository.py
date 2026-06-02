@@ -182,10 +182,16 @@ class ChunkRepository:
         base_statement: Select[tuple[DocumentChunk, Document]],
     ) -> ChunkSearchDiagnostics:
         scope = base_statement.subquery()
-        chunk_count_stmt = select(func.count()).select_from(scope)
-        doc_count_stmt = select(func.count(distinct(scope.c.document_id)))
-        candidate_chunk_count = int((await self._db.execute(chunk_count_stmt)).scalar_one())
-        candidate_document_count = int((await self._db.execute(doc_count_stmt)).scalar_one())
+        counts_stmt = (
+            select(
+                func.count().label("chunk_count"),
+                func.count(distinct(scope.c.document_id)).label("document_count"),
+            )
+            .select_from(scope)
+        )
+        counts = (await self._db.execute(counts_stmt)).one()
+        candidate_chunk_count = int(counts.chunk_count)
+        candidate_document_count = int(counts.document_count)
         return ChunkSearchDiagnostics(
             candidate_document_count=candidate_document_count,
             candidate_chunk_count=candidate_chunk_count,
