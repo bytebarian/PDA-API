@@ -205,7 +205,11 @@ class RulesCategorizationProvider:
                 best_score = hits
                 best_category = category
                 best_keywords_count = len(keywords)
-                matched_keywords = [kw for kw in keywords if re.search(re.escape(kw), haystack)]
+                matched_keywords = [
+                    kw
+                    for kw in keywords
+                    if re.search(rf"(?<!\w){re.escape(kw)}(?!\w)", haystack)
+                ]
 
         if best_score == 0:
             return CategorizationResult(
@@ -215,8 +219,7 @@ class RulesCategorizationProvider:
                 source=CategorizationSource.rules.value,
             )
 
-        # Confidence = fraction of that category's keywords that matched,
-        # scaled slightly by the ratio of max possible score.
+        # Confidence = fraction of that category's keywords that matched.
         confidence = round(best_score / best_keywords_count, 4)
 
         reason = (
