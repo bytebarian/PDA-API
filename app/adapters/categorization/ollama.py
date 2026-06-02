@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 _CATEGORIZATION_PROMPT_TEMPLATE = """\
 You classify a private personal document for a local document assistant.
-Use only the provided text, summary, filename, and metadata.
+Use only the provided text, summary, and filename.
 Choose exactly one category from this allowed list: {allowed_categories}.
 Return valid JSON only:
 {{
