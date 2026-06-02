@@ -29,6 +29,13 @@ class DocumentBase(BaseModel):
     summary_generated_at: datetime | None = None
     summary_status: str | None = "pending"
     summary_error: str | None = None
+    category_source: str | None = None
+    category_confidence: float | None = None
+    category_reason: str | None = None
+    category_model: str | None = None
+    category_generated_at: datetime | None = None
+    category_status: str | None = "pending"
+    category_error: str | None = None
     chunk_count: int = 0
     embedding_model: str | None = None
     last_indexed_at: datetime | None = None
@@ -80,6 +87,10 @@ class DocumentSummary(BaseModel):
     summary: str | None
     summary_status: str | None
     summary_generated_at: datetime | None
+    category_status: str | None
+    category_source: str | None
+    category_confidence: float | None
+    category_generated_at: datetime | None
     created_at: datetime
     updated_at: datetime
 
@@ -116,6 +127,13 @@ class DocumentDetail(BaseModel):
     summary_generated_at: datetime | None
     summary_status: str | None
     summary_error: str | None
+    category_status: str | None
+    category_source: str | None
+    category_confidence: float | None
+    category_reason: str | None
+    category_model: str | None
+    category_generated_at: datetime | None
+    category_error: str | None
     chunk_count: int
     embedding_model: str | None
     last_indexed_at: datetime | None

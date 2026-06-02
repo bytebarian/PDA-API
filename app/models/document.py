@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import DateTime, Index, Integer, String, Text, Uuid, func
+from sqlalchemy import DateTime, Float, Index, Integer, String, Text, Uuid, func
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
@@ -53,6 +53,19 @@ class Document(Base):
         String, nullable=False, default="pending"
     )
     summary_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    category_source: Mapped[str | None] = mapped_column(String, nullable=True)
+    category_confidence: Mapped[float | None] = mapped_column(
+        Float, nullable=True
+    )
+    category_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    category_model: Mapped[str | None] = mapped_column(String, nullable=True)
+    category_generated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    category_status: Mapped[str] = mapped_column(
+        String, nullable=False, default="pending"
+    )
+    category_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     embedding_model: Mapped[str | None] = mapped_column(String, nullable=True)
     last_indexed_at: Mapped[datetime | None] = mapped_column(

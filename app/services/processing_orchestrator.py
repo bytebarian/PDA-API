@@ -388,6 +388,45 @@ async def _run_summary_generation_stage(
     )
 
 
+async def _run_category_assignment_stage(
+    db: AsyncSession, document: Document, job: ProcessingJob
+) -> None:
+    """Run categorization as a non-critical enrichment stage.
+
+    Categorization failure does **not** fail the whole document.  The error is
+    captured in ``document.category_status`` / ``document.category_error`` and
+    the stage history records the outcome so it can be inspected later.
+    """
+    from app.services.categorization_service import categorize_document
+
+    _append_stage_history(
+        job,
+        stage=ProcessingJobStage.category_assignment,
+        status="processing",
+    )
+
+    result = await categorize_document(db, document.id)
+
+    stage_details: dict[str, Any] = {
+        "category_status": result.category_status,
+        "skipped": result.skipped,
+        "category": result.category,
+    }
+    if result.category_source:
+        stage_details["source"] = result.category_source
+    if result.category_model:
+        stage_details["model"] = result.category_model
+    if result.category_error:
+        stage_details["error"] = result.category_error
+
+    _append_stage_history(
+        job,
+        stage=ProcessingJobStage.category_assignment,
+        status="completed",
+        details=stage_details,
+    )
+
+
 def _stage_flow(start_stage: ProcessingJobStage) -> tuple[tuple[ProcessingJobStage, _StageRunner], ...]:
     flow: tuple[tuple[ProcessingJobStage, _StageRunner], ...] = (
         (ProcessingJobStage.upload_received, _run_upload_received_stage),
@@ -399,6 +438,7 @@ def _stage_flow(start_stage: ProcessingJobStage) -> tuple[tuple[ProcessingJobSta
         (ProcessingJobStage.embedding, _run_embedding_stage),
         (ProcessingJobStage.indexing, _run_indexing_stage),
         (ProcessingJobStage.summary_generation, _run_summary_generation_stage),
+        (ProcessingJobStage.category_assignment, _run_category_assignment_stage),
     )
     for index, (stage, _) in enumerate(flow):
         if stage == start_stage:

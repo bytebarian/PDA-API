@@ -55,6 +55,8 @@ async def test_process_job_success_updates_statuses_and_stage_history(db_session
         ("indexing", "completed"),
         ("summary_generation", "processing"),
         ("summary_generation", "completed"),
+        ("category_assignment", "processing"),
+        ("category_assignment", "completed"),
         ("completed", "completed"),
     ]
     assert [(entry["stage"], entry["status"]) for entry in processed.stage_history_jsonb] == expected_flow
@@ -106,6 +108,8 @@ async def test_process_job_success_replaces_prepopulated_legacy_stage_history(
         ("indexing", "completed"),
         ("summary_generation", "processing"),
         ("summary_generation", "completed"),
+        ("category_assignment", "processing"),
+        ("category_assignment", "completed"),
         ("completed", "completed"),
     ]
     assert [(entry["stage"], entry["status"]) for entry in processed.stage_history_jsonb] == expected_flow
@@ -148,6 +152,8 @@ async def test_process_job_success_from_upload_received_stage(db_session: AsyncS
         ("indexing", "completed"),
         ("summary_generation", "processing"),
         ("summary_generation", "completed"),
+        ("category_assignment", "processing"),
+        ("category_assignment", "completed"),
         ("completed", "completed"),
     ]
     assert [(entry["stage"], entry["status"]) for entry in processed.stage_history_jsonb] == expected_flow
