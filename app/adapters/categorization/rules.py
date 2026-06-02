@@ -148,8 +148,7 @@ _RULES: list[tuple[str, list[str]]] = [
     ),
 ]
 
-# Maximum possible score per category (used for normalizing confidence).
-_MAX_POSSIBLE_SCORE = max(len(keywords) for _, keywords in _RULES)
+# NOTE: Confidence is computed per-category based on matched keyword fraction.
 
 
 def _tokenize(text: str) -> str:
