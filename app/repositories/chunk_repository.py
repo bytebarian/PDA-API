@@ -178,7 +178,7 @@ class ChunkRepository:
             categories=categories,
             file_types=file_types,
             embedding_model=embedding_model,
-        ).where(DocumentChunk.embedding_dimension == len(query_embedding))
+        )
 
         rows = (await self._db.execute(statement)).all()
 
