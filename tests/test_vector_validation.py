@@ -24,4 +24,5 @@ def test_validate_embedding_vector_rejects_nan_and_infinity() -> None:
 
 
 def test_similarity_from_cosine_distance() -> None:
-    assert similarity_from_cosine_distance(0.2) == pytest.approx(0.8)
+    assert similarity_from_cosine_distance(0.2) == pytest.approx(0.9)
+    assert similarity_from_cosine_distance(2.0) == 0.0
