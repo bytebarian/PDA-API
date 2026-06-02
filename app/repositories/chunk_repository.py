@@ -81,11 +81,20 @@ class ChunkRepository:
         ``chunk_index`` as a stable tie-breaker.
         """
         bounded_limit = bounded_search_limit(limit)
-        effective_filters = search_filters or SearchFilters(
-            document_ids=document_ids,
-            categories=categories,
-            file_types=file_types,
-        )
+        if search_filters is None:
+            effective_filters = SearchFilters(
+                document_ids=document_ids,
+                categories=categories,
+                file_types=file_types,
+            )
+        else:
+            effective_filters = search_filters.model_copy(deep=True)
+            if effective_filters.document_ids is None and document_ids is not None:
+                effective_filters.document_ids = document_ids
+            if effective_filters.categories is None and categories is not None:
+                effective_filters.categories = categories
+            if effective_filters.file_types is None and file_types is not None:
+                effective_filters.file_types = file_types
         if self._db.bind is None:
             raise RuntimeError("Database session is not bound to an engine")
         dialect = self._db.bind.dialect.name
