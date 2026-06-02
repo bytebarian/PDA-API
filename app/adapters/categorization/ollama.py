@@ -155,7 +155,7 @@ class OllamaCategorizationProvider:
             parsed = json.loads(raw_response)
         except json.JSONDecodeError as exc:
             raise CategorizationProviderResponseError(
-                f"Ollama categorization response is not valid JSON: {raw_response[:200]}"
+                "Ollama categorization response is not valid JSON"
             ) from exc
 
         category = str(parsed.get("category", "")).strip().lower()
