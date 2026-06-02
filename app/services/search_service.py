@@ -168,15 +168,15 @@ class SearchService:
             field_name="query_embedding",
         )
         actual_model: str = result.model or runtime.model
-        rows = await self._repository.semantic_search(
+        effective_filters = request.resolved_filters()
+        search_result = await self._repository.semantic_search(
             query_vector,
             limit=request.top_k,
-            document_ids=request.document_ids,
             min_score=request.min_score,
-            categories=request.categories,
-            file_types=request.file_types,
+            search_filters=effective_filters,
             embedding_model=actual_model,
         )
+        rows = search_result.rows
 
         duration_ms = round((time.perf_counter() - started) * 1000, 2)
         logger.info(
@@ -184,6 +184,8 @@ class SearchService:
             extra={
                 "query_length": len(request.query),
                 "top_k": request.top_k,
+                "candidate_document_count": search_result.diagnostics.candidate_document_count,
+                "candidate_chunk_count": search_result.diagnostics.candidate_chunk_count,
                 "result_count": len(rows),
                 "embedding_model": actual_model,
                 "duration_ms": duration_ms,
@@ -222,7 +224,10 @@ class SearchService:
             query=request.query,
             embedding_model=actual_model,
             top_k=request.top_k,
+            candidate_document_count=search_result.diagnostics.candidate_document_count,
+            candidate_chunk_count=search_result.diagnostics.candidate_chunk_count,
             result_count=len(results),
+            filters_applied=effective_filters.filters_applied(),
             results=results,
         )
 

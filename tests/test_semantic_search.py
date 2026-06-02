@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator, Generator
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -28,6 +29,7 @@ from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.repositories.chunk_repository import ChunkRepository
 from app.schemas.search import SemanticSearchRequest
+from app.schemas.search_filters import SearchFilters
 from app.services.search_service import (
     EmbeddingProviderNotAvailableError,
     SearchService,
@@ -75,13 +77,20 @@ async def _seed_ready_doc(
     category: str | None = "contract",
     file_type: str | None = "pdf",
     path: str | None = "/docs/contract.pdf",
+    status: str = DocumentStatus.ready.value,
+    created_at: datetime | None = None,
+    updated_at: datetime | None = None,
+    metadata_jsonb: dict[str, Any] | None = None,
 ) -> Document:
     doc = Document(
         filename=filename,
-        status=DocumentStatus.ready.value,
+        status=status,
         category=category,
         file_type=file_type,
         path=path,
+        created_at=created_at or datetime.now(timezone.utc),
+        updated_at=updated_at or datetime.now(timezone.utc),
+        metadata_jsonb=metadata_jsonb,
     )
     db.add(doc)
     await db.flush()
@@ -163,11 +172,77 @@ def test_request_accepts_valid_defaults() -> None:
     assert req.document_ids is None
     assert req.categories is None
     assert req.file_types is None
+    assert req.filters is not None
+    assert req.filters.resolved_statuses() == [DocumentStatus.ready.value]
 
 
 def test_request_accepts_boundary_top_k() -> None:
     assert SemanticSearchRequest(query="q", top_k=1).top_k == 1
     assert SemanticSearchRequest(query="q", top_k=50).top_k == 50
+
+
+def test_request_normalizes_legacy_filters_into_filters_object() -> None:
+    doc_id = uuid.uuid4()
+    request = SemanticSearchRequest(
+        query="hello",
+        document_ids=[doc_id],
+        categories=["contract"],
+        file_types=["pdf"],
+    )
+    assert request.filters is not None
+    assert request.filters.document_ids == [doc_id]
+    assert request.filters.categories == ["contract"]
+    assert request.filters.file_types == ["pdf"]
+
+
+def test_request_accepts_camel_case_filter_fields() -> None:
+    doc_id = str(uuid.uuid4())
+    request = SemanticSearchRequest.model_validate(
+        {
+            "query": "hello",
+            "topK": 5,
+            "minScore": 0.5,
+            "includeContent": False,
+            "filters": {
+                "documentIds": [doc_id],
+                "fileTypes": ["pdf"],
+                "filenameContains": "energy",
+            },
+        }
+    )
+    assert request.top_k == 5
+    assert request.min_score == 0.5
+    assert request.include_content is False
+    assert request.filters is not None
+    assert request.filters.document_ids == [uuid.UUID(doc_id)]
+    assert request.filters.file_types == ["pdf"]
+    assert request.filters.filename_contains == "energy"
+
+
+def test_search_filters_reject_invalid_created_date_range() -> None:
+    with pytest.raises(ValidationError):
+        SearchFilters(
+            created_from=datetime(2026, 1, 2, tzinfo=timezone.utc),
+            created_to=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        )
+
+
+def test_search_filters_reject_invalid_modified_date_range() -> None:
+    with pytest.raises(ValidationError):
+        SearchFilters(
+            modified_from=datetime(2026, 1, 2, tzinfo=timezone.utc),
+            modified_to=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        )
+
+
+def test_search_filters_reject_non_object_metadata() -> None:
+    with pytest.raises(ValidationError):
+        SearchFilters.model_validate({"metadata": ["bad"]})
+
+
+def test_search_filters_reject_metadata_value_too_long() -> None:
+    with pytest.raises(ValidationError):
+        SearchFilters(metadata={"supplier": "x" * 501})
 
 
 # ---------------------------------------------------------------------------
@@ -253,7 +328,8 @@ async def test_chunk_repository_returns_ready_documents_only(
     await db_session.commit()
 
     repo = ChunkRepository(db_session)
-    results = await repo.semantic_search(emb)
+    search_result = await repo.semantic_search(emb)
+    results = search_result.rows
 
     assert all(r.document_id == ready_doc.id for r in results)
 
@@ -267,7 +343,8 @@ async def test_chunk_repository_excludes_null_embeddings(
     await db_session.commit()
 
     repo = ChunkRepository(db_session)
-    results = await repo.semantic_search([1.0, 0.0, 0.0, 0.0])
+    search_result = await repo.semantic_search([1.0, 0.0, 0.0, 0.0])
+    results = search_result.rows
 
     assert len(results) == 1
     assert results[0].content == "has embedding"
@@ -287,7 +364,8 @@ async def test_chunk_repository_orders_by_similarity(
     await db_session.commit()
 
     repo = ChunkRepository(db_session)
-    results = await repo.semantic_search([0.9, 0.1, 0.0, 0.0])
+    search_result = await repo.semantic_search([0.9, 0.1, 0.0, 0.0])
+    results = search_result.rows
 
     assert results[0].content == "nearest"
     assert results[0].distance < results[1].distance
@@ -301,7 +379,8 @@ async def test_chunk_repository_respects_limit(db_session: AsyncSession) -> None
     await db_session.commit()
 
     repo = ChunkRepository(db_session)
-    results = await repo.semantic_search([1.0, 0.0, 0.0, 0.0], limit=2)
+    search_result = await repo.semantic_search([1.0, 0.0, 0.0, 0.0], limit=2)
+    results = search_result.rows
 
     assert len(results) == 2
 
@@ -317,7 +396,8 @@ async def test_chunk_repository_filters_by_document_ids(
     await db_session.commit()
 
     repo = ChunkRepository(db_session)
-    results = await repo.semantic_search(emb, document_ids=[doc_a.id])
+    search_result = await repo.semantic_search(emb, document_ids=[doc_a.id])
+    results = search_result.rows
 
     assert all(r.document_id == doc_a.id for r in results)
 
@@ -331,7 +411,8 @@ async def test_chunk_repository_filters_by_category(db_session: AsyncSession) ->
     await db_session.commit()
 
     repo = ChunkRepository(db_session)
-    results = await repo.semantic_search(emb, categories=["contract"])
+    search_result = await repo.semantic_search(emb, categories=["contract"])
+    results = search_result.rows
 
     assert all(r.category == "contract" for r in results)
 
@@ -345,9 +426,204 @@ async def test_chunk_repository_filters_by_file_type(db_session: AsyncSession) -
     await db_session.commit()
 
     repo = ChunkRepository(db_session)
-    results = await repo.semantic_search(emb, file_types=["pdf"])
+    search_result = await repo.semantic_search(emb, file_types=["pdf"])
+    results = search_result.rows
 
     assert all(r.file_type == "pdf" for r in results)
+
+
+async def test_chunk_repository_filters_by_filename_contains_with_escaped_like(
+    db_session: AsyncSession,
+) -> None:
+    matching = await _seed_ready_doc(db_session, filename="energy_offer_100%.pdf")
+    non_matching = await _seed_ready_doc(db_session, filename="employment-contract.pdf")
+    emb = [1.0, 0.0, 0.0, 0.0]
+    await _seed_chunk(db_session, matching.id, content="energy", embedding=emb)
+    await _seed_chunk(db_session, non_matching.id, content="employment", embedding=emb)
+    await db_session.commit()
+
+    repo = ChunkRepository(db_session)
+    search_result = await repo.semantic_search(
+        emb,
+        search_filters=SearchFilters(filename_contains="100%"),
+    )
+
+    assert [row.document_id for row in search_result.rows] == [matching.id]
+
+
+async def test_chunk_repository_filters_by_created_and_modified_ranges(
+    db_session: AsyncSession,
+) -> None:
+    in_range_doc = await _seed_ready_doc(
+        db_session,
+        filename="employment-contract-2025.pdf",
+        created_at=datetime(2025, 1, 10, tzinfo=timezone.utc),
+        updated_at=datetime(2025, 2, 10, tzinfo=timezone.utc),
+    )
+    old_doc = await _seed_ready_doc(
+        db_session,
+        filename="old-rental-contract.docx",
+        file_type="docx",
+        created_at=datetime(2023, 4, 1, tzinfo=timezone.utc),
+        updated_at=datetime(2023, 5, 1, tzinfo=timezone.utc),
+    )
+    emb = [1.0, 0.0, 0.0, 0.0]
+    await _seed_chunk(db_session, in_range_doc.id, content="in range", embedding=emb)
+    await _seed_chunk(db_session, old_doc.id, content="old", embedding=emb)
+    await db_session.commit()
+
+    repo = ChunkRepository(db_session)
+    search_result = await repo.semantic_search(
+        emb,
+        search_filters=SearchFilters(
+            created_from=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            created_to=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            modified_from=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            modified_to=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        ),
+    )
+
+    assert [row.document_id for row in search_result.rows] == [in_range_doc.id]
+
+
+async def test_chunk_repository_filters_by_document_metadata(
+    db_session: AsyncSession,
+) -> None:
+    energy_doc = await _seed_ready_doc(
+        db_session,
+        filename="energy-supplier-offer-2026.pdf",
+        category="offer",
+        metadata_jsonb={"language": "en", "supplier": "energy"},
+    )
+    contract_doc = await _seed_ready_doc(
+        db_session,
+        filename="employment-contract-2025.pdf",
+        category="contract",
+        metadata_jsonb={"language": "en", "supplier": "employer"},
+    )
+    emb = [1.0, 0.0, 0.0, 0.0]
+    await _seed_chunk(db_session, energy_doc.id, content="energy tariff", embedding=emb)
+    await _seed_chunk(db_session, contract_doc.id, content="notice period", embedding=emb)
+    await db_session.commit()
+
+    repo = ChunkRepository(db_session)
+    search_result = await repo.semantic_search(
+        emb,
+        search_filters=SearchFilters(metadata={"supplier": "energy", "language": "en"}),
+    )
+
+    assert [row.document_id for row in search_result.rows] == [energy_doc.id]
+
+
+async def test_chunk_repository_default_status_excludes_processing_documents(
+    db_session: AsyncSession,
+) -> None:
+    ready_doc = await _seed_ready_doc(db_session, filename="ready.pdf")
+    processing_doc = await _seed_ready_doc(
+        db_session,
+        filename="processing.md",
+        status=DocumentStatus.processing.value,
+    )
+    emb = [1.0, 0.0, 0.0, 0.0]
+    await _seed_chunk(db_session, ready_doc.id, content="ready content", embedding=emb)
+    await _seed_chunk(
+        db_session, processing_doc.id, content="processing content", embedding=emb
+    )
+    await db_session.commit()
+
+    repo = ChunkRepository(db_session)
+    search_result = await repo.semantic_search(emb)
+
+    assert [row.document_id for row in search_result.rows] == [ready_doc.id]
+
+
+async def test_chunk_repository_diagnostics_show_filtered_candidate_reduction(
+    db_session: AsyncSession,
+) -> None:
+    employment = await _seed_ready_doc(
+        db_session,
+        filename="employment-contract-2025.pdf",
+        category="contract",
+        file_type="pdf",
+        created_at=datetime(2025, 1, 10, tzinfo=timezone.utc),
+        metadata_jsonb={"language": "en", "supplier": "employer"},
+    )
+    energy = await _seed_ready_doc(
+        db_session,
+        filename="energy-supplier-offer-2026.pdf",
+        category="offer",
+        file_type="pdf",
+        created_at=datetime(2026, 2, 15, tzinfo=timezone.utc),
+        metadata_jsonb={"language": "en", "supplier": "energy"},
+    )
+    old_contract = await _seed_ready_doc(
+        db_session,
+        filename="old-rental-contract.docx",
+        category="contract",
+        file_type="docx",
+        created_at=datetime(2023, 4, 1, tzinfo=timezone.utc),
+        metadata_jsonb={"language": "en", "supplier": "landlord"},
+    )
+    processing = await _seed_ready_doc(
+        db_session,
+        filename="draft-note.md",
+        category="note",
+        file_type="md",
+        status=DocumentStatus.processing.value,
+    )
+    emb = [1.0, 0.0, 0.0, 0.0]
+    await _seed_chunk(db_session, employment.id, content="notice period", embedding=emb)
+    await _seed_chunk(db_session, energy.id, content="tariff cost", embedding=emb)
+    await _seed_chunk(db_session, old_contract.id, content="old notice period", embedding=emb)
+    await _seed_chunk(db_session, processing.id, content="draft", embedding=emb)
+    await db_session.commit()
+
+    repo = ChunkRepository(db_session)
+    unfiltered = await repo.semantic_search(emb, limit=10)
+    filtered = await repo.semantic_search(
+        emb,
+        limit=10,
+        search_filters=SearchFilters(categories=["contract"], file_types=["pdf"]),
+    )
+
+    assert unfiltered.diagnostics.candidate_chunk_count > filtered.diagnostics.candidate_chunk_count
+    assert unfiltered.diagnostics.candidate_document_count > filtered.diagnostics.candidate_document_count
+    assert all(row.document_id == employment.id for row in filtered.rows)
+
+
+async def test_chunk_repository_vector_ranking_happens_within_filtered_candidates(
+    db_session: AsyncSession,
+) -> None:
+    employment = await _seed_ready_doc(
+        db_session, filename="employment-contract.pdf", category="contract"
+    )
+    energy = await _seed_ready_doc(db_session, filename="energy-offer.pdf", category="offer")
+
+    # Energy chunk is globally closest to query, but category filter must exclude it.
+    await _seed_chunk(
+        db_session,
+        employment.id,
+        chunk_index=0,
+        content="employment notice period",
+        embedding=[0.8, 0.2, 0.0, 0.0],
+    )
+    await _seed_chunk(
+        db_session,
+        energy.id,
+        chunk_index=0,
+        content="energy tariff",
+        embedding=[1.0, 0.0, 0.0, 0.0],
+    )
+    await db_session.commit()
+
+    repo = ChunkRepository(db_session)
+    filtered = await repo.semantic_search(
+        [1.0, 0.0, 0.0, 0.0],
+        search_filters=SearchFilters(categories=["contract"]),
+    )
+
+    assert len(filtered.rows) == 1
+    assert filtered.rows[0].document_id == employment.id
 
 
 async def test_chunk_repository_min_score_filter(db_session: AsyncSession) -> None:
@@ -363,9 +639,10 @@ async def test_chunk_repository_min_score_filter(db_session: AsyncSession) -> No
     await db_session.commit()
 
     repo = ChunkRepository(db_session)
-    results = await repo.semantic_search(
+    search_result = await repo.semantic_search(
         [1.0, 0.0, 0.0, 0.0], min_score=0.9
     )
+    results = search_result.rows
 
     assert len(results) == 1
     assert results[0].content == "exact match"
@@ -373,7 +650,8 @@ async def test_chunk_repository_min_score_filter(db_session: AsyncSession) -> No
 
 async def test_chunk_repository_empty_db_returns_empty(db_session: AsyncSession) -> None:
     repo = ChunkRepository(db_session)
-    results = await repo.semantic_search([1.0, 0.0, 0.0, 0.0])
+    search_result = await repo.semantic_search([1.0, 0.0, 0.0, 0.0])
+    results = search_result.rows
     assert results == []
 
 
@@ -400,7 +678,8 @@ async def test_chunk_repository_result_includes_document_metadata(
     await db_session.commit()
 
     repo = ChunkRepository(db_session)
-    results = await repo.semantic_search(emb)
+    search_result = await repo.semantic_search(emb)
+    results = search_result.rows
 
     assert len(results) == 1
     r = results[0]
@@ -592,6 +871,9 @@ async def test_service_document_ids_filter(db_session: AsyncSession) -> None:
     )
 
     assert all(r.document_id == doc_a.id for r in response.results)
+    assert response.candidate_document_count == 1
+    assert response.candidate_chunk_count == 1
+    assert response.filters_applied["document_ids"] == [str(doc_a.id)]
 
 
 async def test_service_skips_non_ready_documents(db_session: AsyncSession) -> None:
@@ -617,6 +899,8 @@ async def test_service_skips_non_ready_documents(db_session: AsyncSession) -> No
     response = await service.semantic_search(SemanticSearchRequest(query="chunk", top_k=10))
 
     assert all(r.document_id == ready.id for r in response.results)
+    assert response.candidate_document_count == 1
+    assert response.candidate_chunk_count == 1
 
 
 async def test_service_include_content_false_omits_text(db_session: AsyncSession) -> None:
@@ -750,6 +1034,8 @@ def test_api_semantic_search_empty_corpus_returns_200(api_client: TestClient) ->
     )
     assert response.status_code == 200
     body = response.json()
+    assert body["candidate_document_count"] == 0
+    assert body["candidate_chunk_count"] == 0
     assert body["result_count"] == 0
     assert body["results"] == []
 
@@ -787,7 +1073,63 @@ def test_api_semantic_search_valid_filters_accepted(api_client: TestClient) -> N
     # Empty corpus → 200 with empty results
     assert response.status_code == 200
     body = response.json()
+    assert body["candidate_document_count"] == 0
+    assert body["candidate_chunk_count"] == 0
     assert body["result_count"] == 0
+    assert body["filters_applied"]["document_ids"] == [doc_id]
+    assert body["filters_applied"]["categories"] == ["contract"]
+    assert body["filters_applied"]["file_types"] == ["pdf"]
+
+
+def test_api_semantic_search_accepts_nested_filters(api_client: TestClient) -> None:
+    response = api_client.post(
+        "/search/semantic",
+        json={
+            "query": "test query",
+            "topK": 5,
+            "filters": {
+                "categories": ["contract"],
+                "fileTypes": ["pdf"],
+                "filenameContains": "employment",
+                "createdFrom": "2025-01-01T00:00:00Z",
+                "createdTo": "2026-01-01T00:00:00Z",
+                "metadata": {"language": "en"},
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["filters_applied"]["categories"] == ["contract"]
+    assert body["filters_applied"]["file_types"] == ["pdf"]
+    assert body["filters_applied"]["filename_contains"] == "employment"
+    assert body["filters_applied"]["metadata_keys"] == ["language"]
+
+
+def test_api_semantic_search_invalid_filter_shape_returns_422(
+    api_client: TestClient,
+) -> None:
+    response = api_client.post(
+        "/search/semantic",
+        json={"query": "x", "filters": {"metadata": ["not", "an", "object"]}},
+    )
+    assert response.status_code == 422
+
+
+def test_api_semantic_search_invalid_date_range_returns_422(
+    api_client: TestClient,
+) -> None:
+    response = api_client.post(
+        "/search/semantic",
+        json={
+            "query": "x",
+            "filters": {
+                "createdFrom": "2026-01-02T00:00:00Z",
+                "createdTo": "2026-01-01T00:00:00Z",
+            },
+        },
+    )
+    assert response.status_code == 422
 
 
 def test_api_semantic_search_provider_unavailable_returns_503(
@@ -903,6 +1245,21 @@ def test_api_semantic_search_openapi_schema_includes_endpoint(
     """Verify the new endpoint is reflected in the OpenAPI schema."""
     response = api_client.get("/openapi.json")
     assert response.status_code == 200
-    paths = response.json().get("paths", {})
+    openapi = response.json()
+    paths = openapi.get("paths", {})
     assert "/search/semantic" in paths
     assert "post" in paths["/search/semantic"]
+    request_ref = paths["/search/semantic"]["post"]["requestBody"]["content"][
+        "application/json"
+    ]["schema"]["$ref"]
+    request_schema_name = request_ref.rsplit("/", 1)[-1]
+    request_props = openapi["components"]["schemas"][request_schema_name]["properties"]
+    assert "filters" in request_props
+
+    response_ref = paths["/search/semantic"]["post"]["responses"]["200"]["content"][
+        "application/json"
+    ]["schema"]["$ref"]
+    response_schema_name = response_ref.rsplit("/", 1)[-1]
+    response_props = openapi["components"]["schemas"][response_schema_name]["properties"]
+    assert "candidate_document_count" in response_props
+    assert "candidate_chunk_count" in response_props
