@@ -155,8 +155,12 @@ class ChunkRepository:
         if search_filters.modified_to:
             statement = statement.where(Document.updated_at < search_filters.modified_to)
         if search_filters.metadata:
-            if self._db.bind is not None and self._db.bind.dialect.name == "postgresql":
-                statement = statement.where(Document.metadata_jsonb.contains(search_filters.metadata))
+            dialect = self._db.bind.dialect.name if self._db.bind is not None else None
+            if dialect == "postgresql":
+                statement = statement.where(
+                    Document.metadata_jsonb.contains(search_filters.metadata)
+                )
+            else:
                 for key, value in search_filters.metadata.items():
                     statement = statement.where(
                         func.json_extract(Document.metadata_jsonb, f'$."{key}"') == value
