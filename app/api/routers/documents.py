@@ -281,9 +281,25 @@ async def update_document(
 
     for field, value in update_data.items():
         setattr(document, field, value)
-    if "category" in update_data:
-        document.category_source = CategorizationSource.manual.value
 
+    if "category" in update_data:
+        from app.adapters.categorization.base import ALLOWED_CATEGORIES
+
+        category = update_data.get("category")
+        if category is not None and category not in ALLOWED_CATEGORIES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"Invalid category {category!r}.",
+            )
+
+        # Manual category assignment should override any provider-generated metadata.
+        document.category_source = CategorizationSource.manual.value
+        document.category_status = "ready" if category is not None else "pending"
+        document.category_confidence = None
+        document.category_reason = None
+        document.category_model = None
+        document.category_generated_at = datetime.now(timezone.utc) if category is not None else None
+        document.category_error = None
     await db.commit()
     return await get_document(document.id, db)
 
