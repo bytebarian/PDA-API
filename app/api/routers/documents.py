@@ -23,6 +23,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.categorization.base import CategorizationSource
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.domain.status import DocumentStatus, ProcessingJobStage, ProcessingJobStatus
@@ -237,6 +238,13 @@ async def get_document(
         summary_generated_at=doc_row.summary_generated_at,
         summary_status=doc_row.summary_status,
         summary_error=doc_row.summary_error,
+        category_status=doc_row.category_status,
+        category_source=doc_row.category_source,
+        category_confidence=doc_row.category_confidence,
+        category_reason=doc_row.category_reason,
+        category_model=doc_row.category_model,
+        category_generated_at=doc_row.category_generated_at,
+        category_error=doc_row.category_error,
         chunk_count=doc_row.chunk_count,
         embedding_model=doc_row.embedding_model,
         last_indexed_at=doc_row.last_indexed_at,
@@ -274,6 +282,30 @@ async def update_document(
     for field, value in update_data.items():
         setattr(document, field, value)
 
+    if "category" in update_data:
+        from app.adapters.categorization.base import ALLOWED_CATEGORIES
+
+        category = update_data.get("category")
+        if category is not None and category not in ALLOWED_CATEGORIES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"Invalid category {category!r}.",
+            )
+
+        # Manual category assignment should override any provider-generated metadata.
+        if category is not None:
+            document.category_source = CategorizationSource.manual.value
+            document.category_status = "ready"
+            document.category_generated_at = datetime.now(timezone.utc)
+        else:
+            # Clearing category should re-enable automatic categorization on next run.
+            document.category_source = None
+            document.category_status = "pending"
+            document.category_generated_at = None
+        document.category_confidence = None
+        document.category_reason = None
+        document.category_model = None
+        document.category_error = None
     await db.commit()
     return await get_document(document.id, db)
 

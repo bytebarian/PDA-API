@@ -41,5 +41,6 @@ class ProcessingJobStage(str, Enum):
     embedding = "embedding"
     indexing = "indexing"
     summary_generation = "summary_generation"
+    category_assignment = "category_assignment"
     completed = "completed"
     failed = "failed"

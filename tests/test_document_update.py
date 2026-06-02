@@ -67,6 +67,7 @@ async def _insert_document(
     filename: str = "doc.pdf",
     path: str = "stored/document.pdf",
     category: str | None = "initial-category",
+    category_source: str | None = None,
     file_type: str | None = "pdf",
     summary: str | None = "initial-summary",
     metadata_jsonb: dict[str, str] | None = None,
@@ -76,6 +77,7 @@ async def _insert_document(
         filename=filename,
         path=path,
         category=category,
+        category_source=category_source,
         file_type=file_type,
         summary=summary,
         metadata_jsonb=metadata_jsonb,
@@ -128,6 +130,26 @@ async def test_patch_document_updates_only_provided_fields(
     assert updated.category == "finance"
     assert updated.file_type == "pdf"
     assert updated.summary == "initial-summary"
+
+
+async def test_patch_document_marks_category_update_manual(
+    client: TestClient, db_session: AsyncSession
+) -> None:
+    document = await _insert_document(db_session, category_source="rules")
+
+    response = client.patch(
+        f"/documents/{document.id}",
+        json={"category": "invoice"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["category_source"] == "manual"
+
+    updated = await db_session.get(Document, document.id)
+    assert updated is not None
+    assert updated.category == "invoice"
+    assert updated.category_source == "manual"
 
 
 async def test_patch_document_replaces_metadata_jsonb(

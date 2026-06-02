@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     summary_max_output_chars: int = 600
     ollama_timeout_seconds: int = 120
 
+    # Categorization settings
+    categorization_provider: str = "rules"
+    categorization_model: str = "llama3.2:3b"
+    categorization_max_input_chars: int = 8000
+    categorization_min_confidence: float = 0.55
+
     # Text normalization settings
     text_normalization_enabled: bool = True
     text_normalization_unicode_form: str = "NFKC"
@@ -126,11 +132,19 @@ class Settings(BaseSettings):
         "summary_max_input_chars",
         "summary_max_output_chars",
         "ollama_timeout_seconds",
+        "categorization_max_input_chars",
     )
     @classmethod
     def must_be_positive(cls, value: int) -> int:
         if value <= 0:
             raise ValueError("must be greater than 0")
+        return value
+
+    @field_validator("categorization_min_confidence")
+    @classmethod
+    def categorization_min_confidence_must_be_fraction(cls, value: float) -> float:
+        if not 0 <= value <= 1:
+            raise ValueError("must be between 0 and 1")
         return value
 
     @field_validator("embedding_distance")
