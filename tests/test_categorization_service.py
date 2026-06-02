@@ -241,6 +241,44 @@ async def test_categorize_document_keeps_high_confidence_category(
     assert result.category == DocumentCategory.invoice.value
 
 
+async def test_categorize_document_passes_configured_model_to_local_provider(
+    db_session: AsyncSession,
+) -> None:
+    from app.adapters.categorization.base import CategorizationResult, CategorizationSource
+    from app.core.config import Settings
+
+    class _LocalProvider:
+        name = CategorizationSource.local_model.value
+
+        def __init__(self) -> None:
+            self.model: object = None
+
+        async def categorize(self, text: str, **kw: object) -> CategorizationResult:
+            self.model = kw.get("model")
+            return CategorizationResult(
+                category=DocumentCategory.invoice.value,
+                confidence=0.9,
+                reason="configured model used",
+                source=CategorizationSource.local_model.value,
+                model=str(self.model),
+            )
+
+        async def healthcheck(self) -> bool:
+            return True
+
+    doc = await _insert_document(db_session, extracted_text="Invoice text.")
+    provider = _LocalProvider()
+    settings = Settings(
+        categorization_provider="ollama",
+        categorization_model="custom-categorizer:latest",
+    )
+
+    result = await categorize_document(db_session, doc.id, provider=provider, settings=settings)  # type: ignore[arg-type]
+
+    assert provider.model == "custom-categorizer:latest"
+    assert result.category_model == "custom-categorizer:latest"
+
+
 # ---------------------------------------------------------------------------
 # Manual category protection
 # ---------------------------------------------------------------------------
