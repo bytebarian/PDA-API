@@ -182,8 +182,8 @@ def test_score_from_distance_two_is_zero() -> None:
     assert score_from_distance(2.0) == 0.0
 
 
-def test_score_from_distance_one_is_zero() -> None:
-    assert score_from_distance(1.0) == 0.0
+def test_score_from_distance_one_is_half() -> None:
+    assert score_from_distance(1.0) == 0.5
 
 
 def test_score_from_distance_never_negative() -> None:

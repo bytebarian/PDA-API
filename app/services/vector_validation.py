@@ -40,4 +40,4 @@ def validate_embedding_vector(
 
 
 def similarity_from_cosine_distance(distance: float) -> float:
-    return max(0.0, 1.0 - float(distance))
+    return max(0.0, 1.0 - float(distance) / 2.0)
