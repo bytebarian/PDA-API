@@ -405,20 +405,40 @@ async def _run_category_assignment_stage(
         status="processing",
     )
 
-    result = await categorize_document(db, document.id)
+    from app.adapters.categorization.base import CategorizationSource, DocumentCategory
 
-    stage_details: dict[str, Any] = {
-        "category_status": result.category_status,
-        "skipped": result.skipped,
-        "category": result.category,
-    }
-    if result.category_source:
-        stage_details["source"] = result.category_source
-    if result.category_model:
-        stage_details["model"] = result.category_model
-    if result.category_error:
-        stage_details["error"] = result.category_error
+    try:
+        result = await categorize_document(db, document.id)
+    except Exception as exc:  # non-critical stage: do not fail the whole pipeline
+        message = str(exc) or exc.__class__.__name__
+        document.category = DocumentCategory.other.value
+        document.category_status = "failed"
+        document.category_source = CategorizationSource.fallback.value
+        document.category_confidence = 0.0
+        document.category_reason = "unexpected_error"
+        document.category_model = None
+        document.category_generated_at = _utcnow()
+        document.category_error = message
 
+        stage_details: dict[str, Any] = {
+            "category_status": "failed",
+            "skipped": False,
+            "category": DocumentCategory.other.value,
+            "source": CategorizationSource.fallback.value,
+            "error": message,
+        }
+    else:
+        stage_details: dict[str, Any] = {
+            "category_status": result.category_status,
+            "skipped": result.skipped,
+            "category": result.category,
+        }
+        if result.category_source:
+            stage_details["source"] = result.category_source
+        if result.category_model:
+            stage_details["model"] = result.category_model
+        if result.category_error:
+            stage_details["error"] = result.category_error
     _append_stage_history(
         job,
         stage=ProcessingJobStage.category_assignment,
