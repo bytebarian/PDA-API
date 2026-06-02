@@ -1,9 +1,11 @@
 """Deterministic rule-based categorization provider.
 
 The classifier scores each category by counting keyword hits across normalized
-text, summary, and filename signals.  Ties are resolved by category order
-(higher priority categories come first).  When the best score does not meet
-the configured minimum confidence threshold the result falls back to ``other``.
+text, summary, and filename signals. Ties are resolved by category order
+(higher priority categories come first).
+
+The returned confidence score can be used by the calling service to demote
+low-confidence results to ``other``.
 
 Keyword sets are intentionally compact and cover English.  Adding keywords for
 additional languages is straightforward – just extend the lists below.
