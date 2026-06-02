@@ -23,6 +23,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.categorization.base import CategorizationSource
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.domain.status import DocumentStatus, ProcessingJobStage, ProcessingJobStatus
@@ -280,6 +281,8 @@ async def update_document(
 
     for field, value in update_data.items():
         setattr(document, field, value)
+    if "category" in update_data:
+        document.category_source = CategorizationSource.manual.value
 
     await db.commit()
     return await get_document(document.id, db)
