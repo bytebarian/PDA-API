@@ -159,9 +159,8 @@ def _count_hits(haystack: str, keywords: list[str]) -> int:
     """Count how many distinct keywords appear in *haystack*."""
     count = 0
     for kw in keywords:
-        # Use word-boundary-aware matching to avoid partial word matches
-        # (e.g. "note" should not match "noted" unless both are present).
-        pattern = re.escape(kw)
+        # Match whole keywords/phrases (avoid partial word matches like "note" in "noted").
+        pattern = rf"(?<!\w){re.escape(kw)}(?!\w)"
         if re.search(pattern, haystack):
             count += 1
     return count
