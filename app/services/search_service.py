@@ -131,12 +131,22 @@ class SearchService:
 
         from app.services.vector_validation import validate_embedding_vector
 
+        if len(embed_results) != 1:
+            raise SearchServiceError(
+                f"Embedding provider returned {len(embed_results)} embeddings for 1 query"
+            )
+        result = embed_results[0]
+        if result.text_index != 0:
+            raise SearchServiceError(
+                f"Embedding provider returned embedding for unexpected index {result.text_index}"
+            )
+
         query_vector = validate_embedding_vector(
-            embed_results[0].vector,
+            result.vector,
             expected_dimensions=runtime.dimensions,
             field_name="query_embedding",
         )
-        actual_model: str = embed_results[0].model or runtime.model
+        actual_model: str = result.model or runtime.model
         rows = await self._repository.semantic_search(
             query_vector,
             limit=request.top_k,
