@@ -130,10 +130,17 @@ class SearchService:
                 f"Embedding provider returned an error: {exc}"
             ) from exc
         finally:
-            if getattr(self, "_owns_providers", False):
-                close = getattr(provider, "aclose", None)
-                if callable(close):
-                    await close()
+            if self._owns_providers:
+                for owned_provider in self._providers.values():
+                    close = getattr(owned_provider, "aclose", None)
+                    if callable(close):
+                        try:
+                            await close()
+                        except Exception:
+                            logger.debug(
+                                "Failed to close embedding provider cleanly",
+                                exc_info=True,
+                            )
 
         from app.services.vector_validation import validate_embedding_vector
 
