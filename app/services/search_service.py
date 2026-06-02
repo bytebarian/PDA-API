@@ -126,6 +126,14 @@ class SearchService:
                 f"Embedding provider '{runtime.provider}' is unavailable: {exc}"
             ) from exc
         except EmbeddingProviderError as exc:
+            # Treat dimension mismatches as configuration errors so the router can
+            # return a 503 instead of a 500.
+            from app.adapters.embeddings import EmbeddingDimensionMismatchError
+
+            if isinstance(exc, EmbeddingDimensionMismatchError):
+                raise SearchConfigurationError(
+                    f"Embedding dimensions mismatch for provider '{runtime.provider}' / model '{runtime.model}': {exc}"
+                ) from exc
             raise SearchServiceError(
                 f"Embedding provider returned an error: {exc}"
             ) from exc
