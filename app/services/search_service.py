@@ -129,6 +129,19 @@ class SearchService:
             raise SearchServiceError(
                 f"Embedding provider returned an error: {exc}"
             ) from exc
+        finally:
+            if getattr(self, "_owns_providers", False):
+                close = getattr(provider, "aclose", None)
+                if callable(close):
+                    await close()
+        except EmbeddingProviderUnavailableError as exc:
+            raise EmbeddingProviderNotAvailableError(
+                f"Embedding provider '{runtime.provider}' is unavailable: {exc}"
+            ) from exc
+        except EmbeddingProviderError as exc:
+            raise SearchServiceError(
+                f"Embedding provider returned an error: {exc}"
+            ) from exc
 
         from app.services.vector_validation import validate_embedding_vector
 
