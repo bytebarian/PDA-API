@@ -39,6 +39,10 @@ def test_document_has_expected_columns() -> None:
         "metadata_jsonb",
         "extracted_text",
         "summary",
+        "summary_model",
+        "summary_generated_at",
+        "summary_status",
+        "summary_error",
         "chunk_count",
         "embedding_model",
         "last_indexed_at",
@@ -96,6 +100,9 @@ def test_document_optional_fields_default_none() -> None:
     assert doc.metadata_jsonb is None
     assert doc.extracted_text is None
     assert doc.summary is None
+    assert doc.summary_model is None
+    assert doc.summary_generated_at is None
+    assert doc.summary_error is None
     assert doc.embedding_model is None
     assert doc.last_indexed_at is None
 

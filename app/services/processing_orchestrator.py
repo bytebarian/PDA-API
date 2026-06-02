@@ -352,6 +352,42 @@ async def _run_indexing_stage(
     _append_stage_history(job, stage=ProcessingJobStage.indexing, status="completed")
 
 
+async def _run_summary_generation_stage(
+    db: AsyncSession, document: Document, job: ProcessingJob
+) -> None:
+    """Run summarization as a non-critical enrichment stage.
+
+    Summarization failure does **not** fail the whole document.  The error is
+    captured in ``document.summary_status`` / ``document.summary_error`` and
+    the stage history records the outcome so it can be inspected later.
+    """
+    from app.services.summarization_service import summarize_document
+
+    _append_stage_history(
+        job,
+        stage=ProcessingJobStage.summary_generation,
+        status="processing",
+    )
+
+    result = await summarize_document(db, document.id)
+
+    stage_details: dict[str, Any] = {
+        "summary_status": result.summary_status,
+        "skipped": result.skipped,
+    }
+    if result.summary_model:
+        stage_details["model"] = result.summary_model
+    if result.summary_error:
+        stage_details["error"] = result.summary_error
+
+    _append_stage_history(
+        job,
+        stage=ProcessingJobStage.summary_generation,
+        status="completed",
+        details=stage_details,
+    )
+
+
 def _stage_flow(start_stage: ProcessingJobStage) -> tuple[tuple[ProcessingJobStage, _StageRunner], ...]:
     flow: tuple[tuple[ProcessingJobStage, _StageRunner], ...] = (
         (ProcessingJobStage.upload_received, _run_upload_received_stage),
@@ -362,6 +398,7 @@ def _stage_flow(start_stage: ProcessingJobStage) -> tuple[tuple[ProcessingJobSta
         (ProcessingJobStage.chunking, _run_chunking_stage),
         (ProcessingJobStage.embedding, _run_embedding_stage),
         (ProcessingJobStage.indexing, _run_indexing_stage),
+        (ProcessingJobStage.summary_generation, _run_summary_generation_stage),
     )
     for index, (stage, _) in enumerate(flow):
         if stage == start_stage:

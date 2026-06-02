@@ -25,6 +25,10 @@ class DocumentBase(BaseModel):
     metadata_jsonb: dict[str, Any] | None = None
     extracted_text: str | None = None
     summary: str | None = None
+    summary_model: str | None = None
+    summary_generated_at: datetime | None = None
+    summary_status: str | None = "pending"
+    summary_error: str | None = None
     chunk_count: int = 0
     embedding_model: str | None = None
     last_indexed_at: datetime | None = None
@@ -73,6 +77,9 @@ class DocumentSummary(BaseModel):
     status: DocumentStatus
     size: int
     chunk_count: int
+    summary: str | None
+    summary_status: str | None
+    summary_generated_at: datetime | None
     created_at: datetime
     updated_at: datetime
 
@@ -105,6 +112,10 @@ class DocumentDetail(BaseModel):
     size: int
     checksum_sha256: str | None
     summary: str | None
+    summary_model: str | None
+    summary_generated_at: datetime | None
+    summary_status: str | None
+    summary_error: str | None
     chunk_count: int
     embedding_model: str | None
     last_indexed_at: datetime | None
