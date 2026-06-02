@@ -304,7 +304,8 @@ async def test_process_job_no_text_produces_skipped_category(
 
     refreshed = await db_session.get(Document, doc_id)
     assert refreshed is not None
-    assert refreshed.category_status in {"skipped", "failed"}
+    assert refreshed.category_status == "skipped"
+    assert refreshed.category_error == "no_extracted_text"
     assert result.skipped is True
 
 
