@@ -54,7 +54,7 @@ async def semantic_search(
         logger.error("Search configuration error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Search is not configured: {exc}",
+            detail="Search is not configured on this server.",
         ) from exc
     except SearchServiceError as exc:
         logger.error("Search service error: %s", exc)
