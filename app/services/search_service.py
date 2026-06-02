@@ -182,9 +182,9 @@ class SearchService:
                     distance=row.distance,
                     score=score,
                     metadata={
+                        **(row.metadata or {}),
                         "source": "document_chunks",
                         "embedding_model": actual_model,
-                        **(row.metadata or {}),
                     },
                 )
             )
