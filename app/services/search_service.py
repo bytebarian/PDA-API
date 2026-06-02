@@ -69,13 +69,9 @@ class _EmbeddingRuntime:
 
 
 def _build_providers(settings: Settings) -> dict[str, EmbeddingProvider]:
-    return {
-        "fake": FakeEmbeddingProvider(),
-        "ollama": OllamaEmbeddingProvider(
-            base_url=settings.ollama_base_url,
-            timeout_seconds=settings.embedding_timeout_seconds,
-        ),
-    }
+    from app.services.embedding_service import build_embedding_providers
+
+    return build_embedding_providers(settings)
 
 
 class SearchService:
