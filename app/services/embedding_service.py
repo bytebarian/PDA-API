@@ -292,6 +292,13 @@ class EmbeddingService:
             maybe_aclose = getattr(provider, "aclose", None)
             if maybe_aclose is None:
                 continue
-            close_result = maybe_aclose()
-            if inspect.isawaitable(close_result):
-                await close_result
+            try:
+                close_result = maybe_aclose()
+                if inspect.isawaitable(close_result):
+                    await close_result
+            except Exception:
+                logger.warning(
+                    "Failed to close embedding provider",
+                    exc_info=True,
+                    extra={"provider": getattr(provider, "name", type(provider).__name__)},
+                )
