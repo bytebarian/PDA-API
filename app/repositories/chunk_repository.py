@@ -157,10 +157,9 @@ class ChunkRepository:
         if search_filters.metadata:
             if self._db.bind is not None and self._db.bind.dialect.name == "postgresql":
                 statement = statement.where(Document.metadata_jsonb.contains(search_filters.metadata))
-            else:
                 for key, value in search_filters.metadata.items():
                     statement = statement.where(
-                        func.json_extract(Document.metadata_jsonb, f"$.{key}") == value
+                        func.json_extract(Document.metadata_jsonb, f'$."{key}"') == value
                     )
         if embedding_model:
             statement = statement.where(DocumentChunk.embedding_model == embedding_model)
