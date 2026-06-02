@@ -124,7 +124,7 @@ class SearchService:
                 [request.query],
                 model=runtime.model,
                 dimensions=runtime.dimensions,
-                truncate=True,
+                truncate=self._settings.embedding_truncate,
             )
         except EmbeddingProviderUnavailableError as exc:
             raise EmbeddingProviderNotAvailableError(
