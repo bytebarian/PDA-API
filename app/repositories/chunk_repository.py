@@ -132,9 +132,9 @@ class ChunkRepository:
             .add_columns(distance_expr.label("distance"))
         )
         if min_score is not None and min_score > 0.0:
-            # score = max(0, 1 - distance) >= min_score
-            # => distance <= 1 - min_score
-            statement = statement.where(distance_expr <= (1.0 - min_score))
+            # score = max(0, 1 - distance / 2) >= min_score
+            # => distance <= 2 * (1 - min_score)
+            statement = statement.where(distance_expr <= (2.0 * (1.0 - min_score)))
         statement = (
             statement.order_by(distance_expr.asc(), DocumentChunk.chunk_index.asc())
             .limit(limit)

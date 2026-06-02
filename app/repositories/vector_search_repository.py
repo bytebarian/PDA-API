@@ -133,7 +133,7 @@ class VectorSearchRepository:
             .add_columns(distance_expr.label("distance"))
         )
         if min_similarity is not None and min_similarity > 0.0:
-            statement = statement.where(distance_expr <= (1.0 - min_similarity))
+            statement = statement.where(distance_expr <= (2.0 * (1.0 - min_similarity)))
         statement = statement.order_by(distance_expr.asc()).limit(limit)
 
         rows = (await self._db.execute(statement)).all()
