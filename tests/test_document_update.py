@@ -139,7 +139,7 @@ async def test_patch_document_marks_category_update_manual(
 
     response = client.patch(
         f"/documents/{document.id}",
-        json={"category": "finance"},
+        json={"category": "invoice"},
     )
 
     assert response.status_code == 200
@@ -148,7 +148,7 @@ async def test_patch_document_marks_category_update_manual(
 
     updated = await db_session.get(Document, document.id)
     assert updated is not None
-    assert updated.category == "finance"
+    assert updated.category == "invoice"
     assert updated.category_source == "manual"
 
 
