@@ -135,7 +135,7 @@ class OllamaCategorizationProvider:
 
         if response.status_code != 200:
             raise CategorizationProviderResponseError(
-                f"Ollama returned HTTP {response.status_code}: {response.text[:200]}"
+                f"Ollama returned HTTP {response.status_code} during categorization"
             )
 
         try:
