@@ -216,13 +216,23 @@ async def categorize_document(
         source_text = source_text[:max_input]
 
     # --- Call provider ---------------------------------------------------
+    model = resolved_settings.categorization_model
     try:
-        result = await resolved_provider.categorize(
-            source_text,
-            filename=document.filename,
-            summary=document.summary,
-            metadata=document.metadata_jsonb,
-        )
+        if resolved_provider.name == CategorizationSource.local_model.value:
+            result = await resolved_provider.categorize(  # type: ignore[call-arg]
+                source_text,
+                filename=document.filename,
+                summary=document.summary,
+                metadata=document.metadata_jsonb,
+                model=model,
+            )
+        else:
+            result = await resolved_provider.categorize(
+                source_text,
+                filename=document.filename,
+                summary=document.summary,
+                metadata=document.metadata_jsonb,
+            )
     except CategorizationError as exc:
         error_reason = str(exc) or exc.__class__.__name__
         logger.warning(
