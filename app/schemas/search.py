@@ -40,14 +40,16 @@ class SemanticSearchRequest(BaseModel):
 
     @model_validator(mode="after")
     def _normalize_legacy_top_level_filters(self) -> SemanticSearchRequest:
-        merged = self.filters.model_copy(deep=True) if self.filters is not None else SearchFilters()
-        if merged.document_ids is None and self.document_ids is not None:
-            merged.document_ids = self.document_ids
-        if merged.categories is None and self.categories is not None:
-            merged.categories = self.categories
-        if merged.file_types is None and self.file_types is not None:
-            merged.file_types = self.file_types
-        self.filters = merged
+        merged_data = (
+            self.filters.model_dump(mode="python") if self.filters is not None else {}
+        )
+        if merged_data.get("document_ids") is None and self.document_ids is not None:
+            merged_data["document_ids"] = self.document_ids
+        if merged_data.get("categories") is None and self.categories is not None:
+            merged_data["categories"] = self.categories
+        if merged_data.get("file_types") is None and self.file_types is not None:
+            merged_data["file_types"] = self.file_types
+        self.filters = SearchFilters.model_validate(merged_data)
         return self
 
     def resolved_filters(self) -> SearchFilters:
