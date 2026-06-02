@@ -133,6 +133,9 @@ class VectorSearchRepository:
             .add_columns(distance_expr.label("distance"))
         )
         if min_similarity is not None and min_similarity > 0.0:
+            # score = max(0, 1 - distance / 2) >= min_similarity
+            # max(0, ...) does not affect the bound for positive scores.
+            # => distance <= 2 * (1 - min_similarity)
             statement = statement.where(distance_expr <= (2.0 * (1.0 - min_similarity)))
         statement = statement.order_by(distance_expr.asc()).limit(limit)
 

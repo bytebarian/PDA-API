@@ -133,6 +133,7 @@ class ChunkRepository:
         )
         if min_score is not None and min_score > 0.0:
             # score = max(0, 1 - distance / 2) >= min_score
+            # max(0, ...) does not affect the bound for positive scores.
             # => distance <= 2 * (1 - min_score)
             statement = statement.where(distance_expr <= (2.0 * (1.0 - min_score)))
         statement = (
