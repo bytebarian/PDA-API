@@ -20,15 +20,6 @@ from app.repositories.vector_search_repository import (
 from app.services.vector_validation import similarity_from_cosine_distance
 
 
-def score_from_distance(distance: float) -> float:
-    """Map cosine distance [0, 2] to a stable score in [0, 1].
-
-    Uses the formula ``max(0, 1 - distance)`` so the returned value is
-    always non-negative and reaches 1.0 for identical vectors.
-    """
-    return similarity_from_cosine_distance(distance)
-
-
 @dataclass
 class ChunkSearchRow:
     """Raw row returned by the semantic search query."""
@@ -198,7 +189,7 @@ class ChunkRepository:
             if embedding is None or len(embedding) != len(query_embedding):
                 continue
             distance = cosine_distance(list(embedding), query_embedding)
-            score = score_from_distance(distance)
+            score = similarity_from_cosine_distance(distance)
             if min_score is not None and score < min_score:
                 continue
             scored.append(

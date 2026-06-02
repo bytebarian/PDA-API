@@ -25,12 +25,15 @@ from app.domain.status import DocumentStatus
 from app.main import app as fastapi_app
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
-from app.repositories.chunk_repository import ChunkRepository, score_from_distance
+from app.repositories.chunk_repository import ChunkRepository
 from app.schemas.search import SemanticSearchRequest
 from app.services.search_service import (
     EmbeddingProviderNotAvailableError,
     SearchService,
     _make_excerpt,
+)
+from app.services.vector_validation import (
+    similarity_from_cosine_distance as score_from_distance,
 )
 
 import app.models  # noqa: F401 – register all ORM models

@@ -18,12 +18,13 @@ from app.adapters.embeddings import (
 )
 from app.core.config import Settings, get_settings
 from app.models.app_settings import AppSettings
-from app.repositories.chunk_repository import ChunkRepository, score_from_distance
+from app.repositories.chunk_repository import ChunkRepository
 from app.schemas.search import (
     SemanticSearchRequest,
     SemanticSearchResponse,
     SemanticSearchResult,
 )
+from app.services.vector_validation import similarity_from_cosine_distance
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +162,7 @@ class SearchService:
 
         results: list[SemanticSearchResult] = []
         for row in rows:
-            score = score_from_distance(row.distance)
+            score = similarity_from_cosine_distance(row.distance)
             text_value = row.content if request.include_content else None
             excerpt = _make_excerpt(row.content)
             results.append(
