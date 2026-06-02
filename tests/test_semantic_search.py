@@ -350,6 +350,34 @@ async def test_chunk_repository_excludes_null_embeddings(
     assert results[0].content == "has embedding"
 
 
+async def test_chunk_repository_skips_mismatched_embedding_dimensions(
+    db_session: AsyncSession,
+) -> None:
+    doc = await _seed_ready_doc(db_session)
+    await _seed_chunk(
+        db_session,
+        doc.id,
+        content="valid embedding",
+        embedding=[1.0, 0.0, 0.0, 0.0],
+    )
+    await _seed_chunk(
+        db_session,
+        doc.id,
+        chunk_index=1,
+        content="mismatched embedding",
+        embedding=[1.0, 0.0, 0.0],
+        embedding_dimension=_DIM,
+    )
+    await db_session.commit()
+
+    repo = ChunkRepository(db_session)
+    search_result = await repo.semantic_search([1.0, 0.0, 0.0, 0.0])
+    results = search_result.rows
+
+    assert len(results) == 1
+    assert results[0].content == "valid embedding"
+
+
 async def test_chunk_repository_orders_by_similarity(
     db_session: AsyncSession,
 ) -> None:

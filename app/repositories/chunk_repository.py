@@ -246,6 +246,8 @@ class ChunkRepository:
             embedding = chunk.embedding
             if embedding is None:
                 continue
+            if len(embedding) != len(query_embedding):
+                continue
             distance = cosine_distance(list(embedding), query_embedding)
             score = similarity_from_cosine_distance(distance)
             if min_score is not None and score < min_score:
