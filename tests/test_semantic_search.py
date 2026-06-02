@@ -540,7 +540,7 @@ async def test_service_min_score_filters_low_quality_results(
     # Use hand-crafted vectors to get known distances
     query_emb = [1.0, 0.0, 0.0, 0.0]
     high_emb = [1.0, 0.0, 0.0, 0.0]   # distance ≈ 0  → score ≈ 1.0
-    low_emb = [0.0, 1.0, 0.0, 0.0]    # distance ≈ 1  → score ≈ 0.0
+    low_emb = [0.0, 1.0, 0.0, 0.0]    # distance ≈ 1  → score ≈ 0.5
 
     await _seed_chunk(
         db_session, doc.id, chunk_index=0, content="high score",
