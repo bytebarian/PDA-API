@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from app.domain.status import DocumentStatus, ProcessingJobStage, ProcessingJobStatus
 
@@ -87,12 +87,10 @@ class DocumentSummary(BaseModel):
     summary: str | None
     summary_status: str | None
     summary_generated_at: datetime | None
-    category_status: str | None = Field(serialization_alias="categoryStatus")
-    category_source: str | None = Field(serialization_alias="categorySource")
-    category_confidence: float | None = Field(serialization_alias="categoryConfidence")
-    category_generated_at: datetime | None = Field(
-        serialization_alias="categoryGeneratedAt"
-    )
+    category_status: str | None
+    category_source: str | None
+    category_confidence: float | None
+    category_generated_at: datetime | None
     created_at: datetime
     updated_at: datetime
 
@@ -129,15 +127,13 @@ class DocumentDetail(BaseModel):
     summary_generated_at: datetime | None
     summary_status: str | None
     summary_error: str | None
-    category_status: str | None = Field(serialization_alias="categoryStatus")
-    category_source: str | None = Field(serialization_alias="categorySource")
-    category_confidence: float | None = Field(serialization_alias="categoryConfidence")
-    category_reason: str | None = Field(serialization_alias="categoryReason")
-    category_model: str | None = Field(serialization_alias="categoryModel")
-    category_generated_at: datetime | None = Field(
-        serialization_alias="categoryGeneratedAt"
-    )
-    category_error: str | None = Field(serialization_alias="categoryError")
+    category_status: str | None
+    category_source: str | None
+    category_confidence: float | None
+    category_reason: str | None
+    category_model: str | None
+    category_generated_at: datetime | None
+    category_error: str | None
     chunk_count: int
     embedding_model: str | None
     last_indexed_at: datetime | None

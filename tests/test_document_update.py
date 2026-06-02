@@ -144,7 +144,7 @@ async def test_patch_document_marks_category_update_manual(
 
     assert response.status_code == 200
     body = response.json()
-    assert body["categorySource"] == "manual"
+    assert body["category_source"] == "manual"
 
     updated = await db_session.get(Document, document.id)
     assert updated is not None
