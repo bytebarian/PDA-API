@@ -410,6 +410,10 @@ async def _run_category_assignment_stage(
     try:
         result = await categorize_document(db, document.id)
     except Exception as exc:  # non-critical stage: do not fail the whole pipeline
+        import asyncio
+
+        if isinstance(exc, asyncio.CancelledError):
+            raise
         message = str(exc) or exc.__class__.__name__
         document.category = DocumentCategory.other.value
         document.category_status = "failed"
