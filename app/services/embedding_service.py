@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -90,6 +91,7 @@ class EmbeddingService:
     ) -> None:
         self._db = db
         self._settings = settings or get_settings()
+        self._owns_providers = providers is None
         self._providers = providers if providers is not None else build_embedding_providers(self._settings)
 
     async def generate_embeddings_for_document(
@@ -102,123 +104,126 @@ class EmbeddingService:
         dimensions: int | None = None,
         batch_size: int | None = None,
     ) -> EmbeddingGenerationResult:
-        started = time.perf_counter()
-        document = await self._db.get(Document, document_id)
-        if document is None:
-            raise DocumentNotFoundError(f"Document not found: {document_id}")
+        try:
+            started = time.perf_counter()
+            document = await self._db.get(Document, document_id)
+            if document is None:
+                raise DocumentNotFoundError(f"Document not found: {document_id}")
 
-        if job_id is not None:
-            job = await self._db.get(ProcessingJob, job_id)
-            if job is None:
-                raise EmbeddingServiceError(f"Processing job not found: {job_id}")
-            if job.document_id != document.id:
-                raise EmbeddingServiceError(
-                    f"Processing job {job_id} does not belong to document {document.id}"
-                )
-
-        chunks = await self._load_chunks(document_id)
-        if not chunks or not any(chunk.content.strip() for chunk in chunks):
-            raise NoChunksToEmbedError(f"Document {document_id} has no chunks to embed")
-
-        runtime = await self._resolve_runtime_config(
-            provider_name=provider_name,
-            model=model,
-            dimensions=dimensions,
-            batch_size=batch_size,
-        )
-        provider = self._providers.get(runtime.provider)
-        if provider is None:
-            raise UnknownEmbeddingProviderError(
-                f"Unknown embedding provider '{runtime.provider}'"
-            )
-
-        pending_updates: list[tuple[DocumentChunk, list[float], str]] = []
-        actual_model: str | None = None
-        for start in range(0, len(chunks), runtime.batch_size):
-            chunk_batch = chunks[start : start + runtime.batch_size]
-            texts = [chunk.content for chunk in chunk_batch]
-            results = await provider.embed_texts(
-                texts,
-                model=runtime.model,
-                dimensions=runtime.dimensions,
-                truncate=runtime.truncate,
-            )
-            if len(results) != len(chunk_batch):
-                raise EmbeddingProviderResponseError(
-                    f"Provider returned {len(results)} embeddings for {len(chunk_batch)} chunks"
-                )
-            indexed = {result.text_index: result for result in results}
-            expected_indices = set(range(len(chunk_batch)))
-            if set(indexed) != expected_indices:
-                raise EmbeddingProviderResponseError(
-                    "Provider returned embedding indices that do not match the input batch"
-                )
-
-            for index, chunk in enumerate(chunk_batch):
-                embedding = indexed[index]
-                if embedding.dimensions != runtime.dimensions:
-                    raise EmbeddingDimensionMismatchError(
-                        f"Embedding dimensions {embedding.dimensions} do not match expected {runtime.dimensions}"
+            if job_id is not None:
+                job = await self._db.get(ProcessingJob, job_id)
+                if job is None:
+                    raise EmbeddingServiceError(f"Processing job not found: {job_id}")
+                if job.document_id != document.id:
+                    raise EmbeddingServiceError(
+                        f"Processing job {job_id} does not belong to document {document.id}"
                     )
-                if actual_model is None:
-                    actual_model = embedding.model
-                elif actual_model != embedding.model:
+
+            chunks = await self._load_chunks(document_id)
+            if not chunks or not any(chunk.content.strip() for chunk in chunks):
+                raise NoChunksToEmbedError(f"Document {document_id} has no chunks to embed")
+
+            runtime = await self._resolve_runtime_config(
+                provider_name=provider_name,
+                model=model,
+                dimensions=dimensions,
+                batch_size=batch_size,
+            )
+            provider = self._providers.get(runtime.provider)
+            if provider is None:
+                raise UnknownEmbeddingProviderError(
+                    f"Unknown embedding provider '{runtime.provider}'"
+                )
+
+            pending_updates: list[tuple[DocumentChunk, list[float], str]] = []
+            actual_model: str | None = None
+            for start in range(0, len(chunks), runtime.batch_size):
+                chunk_batch = chunks[start : start + runtime.batch_size]
+                texts = [chunk.content for chunk in chunk_batch]
+                results = await provider.embed_texts(
+                    texts,
+                    model=runtime.model,
+                    dimensions=runtime.dimensions,
+                    truncate=runtime.truncate,
+                )
+                if len(results) != len(chunk_batch):
                     raise EmbeddingProviderResponseError(
-                        f"Provider returned inconsistent model names across batches: "
-                        f"'{actual_model}' vs '{embedding.model}'"
+                        f"Provider returned {len(results)} embeddings for {len(chunk_batch)} chunks"
                     )
-                pending_updates.append((chunk, embedding.vector, embedding.model))
+                indexed = {result.text_index: result for result in results}
+                expected_indices = set(range(len(chunk_batch)))
+                if set(indexed) != expected_indices:
+                    raise EmbeddingProviderResponseError(
+                        "Provider returned embedding indices that do not match the input batch"
+                    )
 
-        if actual_model is None:
-            raise EmbeddingProviderResponseError(
-                "Provider returned no model name; cannot determine authoritative embedding model"
+                for index, chunk in enumerate(chunk_batch):
+                    embedding = indexed[index]
+                    if embedding.dimensions != runtime.dimensions:
+                        raise EmbeddingDimensionMismatchError(
+                            f"Embedding dimensions {embedding.dimensions} do not match expected {runtime.dimensions}"
+                        )
+                    if actual_model is None:
+                        actual_model = embedding.model
+                    elif actual_model != embedding.model:
+                        raise EmbeddingProviderResponseError(
+                            f"Provider returned inconsistent model names across batches: "
+                            f"'{actual_model}' vs '{embedding.model}'"
+                        )
+                    pending_updates.append((chunk, embedding.vector, embedding.model))
+
+            if actual_model is None:
+                raise EmbeddingProviderResponseError(
+                    "Provider returned no model name; cannot determine authoritative embedding model"
+                )
+
+            # Validate every vector before mutating any chunk so a validation
+            # failure never leaves partial vectors in the session.
+            chunks_with_validated_vectors: list[tuple[DocumentChunk, list[float], str]] = [
+                (
+                    chunk,
+                    validate_embedding_vector(
+                        vector,
+                        expected_dimensions=runtime.dimensions,
+                    ),
+                    model_name,
+                )
+                for chunk, vector, model_name in pending_updates
+            ]
+
+            # Apply mutations atomically only after all batches have been fetched
+            # and validated, so a failed embedding run never leaves partial vectors.
+            for chunk, vector, model_name in chunks_with_validated_vectors:
+                chunk.embedding = vector
+                chunk.embedding_model = model_name
+                chunk.embedding_provider = runtime.provider
+                chunk.embedding_dimension = runtime.dimensions
+                chunk.embedding_created_at = _utcnow()
+            embedded_count = len(pending_updates)
+            document.embedding_model = actual_model
+            document.chunk_count = len(chunks)
+            document.last_indexed_at = _utcnow()
+            duration_ms = round((time.perf_counter() - started) * 1000, 2)
+            logger.info(
+                "Document embeddings persisted",
+                extra={
+                    "document_id": str(document.id),
+                    "chunk_count": len(chunks),
+                    "embedding_model": actual_model,
+                    "embedding_dimension": runtime.dimensions,
+                    "duration_ms": duration_ms,
+                },
             )
 
-        # Validate every vector before mutating any chunk so a validation
-        # failure never leaves partial vectors in the session.
-        chunks_with_validated_vectors: list[tuple[DocumentChunk, list[float], str]] = [
-            (
-                chunk,
-                validate_embedding_vector(
-                    vector,
-                    expected_dimensions=runtime.dimensions,
-                ),
-                model_name,
+            return EmbeddingGenerationResult(
+                document_id=document.id,
+                embedded_chunk_count=embedded_count,
+                provider=runtime.provider,
+                model=actual_model,
+                dimensions=runtime.dimensions,
             )
-            for chunk, vector, model_name in pending_updates
-        ]
-
-        # Apply mutations atomically only after all batches have been fetched
-        # and validated, so a failed embedding run never leaves partial vectors.
-        for chunk, vector, model_name in chunks_with_validated_vectors:
-            chunk.embedding = vector
-            chunk.embedding_model = model_name
-            chunk.embedding_provider = runtime.provider
-            chunk.embedding_dimension = runtime.dimensions
-            chunk.embedding_created_at = _utcnow()
-        embedded_count = len(pending_updates)
-        document.embedding_model = actual_model
-        document.chunk_count = len(chunks)
-        document.last_indexed_at = _utcnow()
-        duration_ms = round((time.perf_counter() - started) * 1000, 2)
-        logger.info(
-            "Document embeddings persisted",
-            extra={
-                "document_id": str(document.id),
-                "chunk_count": len(chunks),
-                "embedding_model": actual_model,
-                "embedding_dimension": runtime.dimensions,
-                "duration_ms": duration_ms,
-            },
-        )
-
-        return EmbeddingGenerationResult(
-            document_id=document.id,
-            embedded_chunk_count=embedded_count,
-            provider=runtime.provider,
-            model=actual_model,
-            dimensions=runtime.dimensions,
-        )
+        finally:
+            await self._aclose_owned_providers()
 
     async def _resolve_runtime_config(
         self,
@@ -278,3 +283,15 @@ class EmbeddingService:
             select(AppSettings).order_by(AppSettings.updated_at.desc()).limit(1)
         )
         return result.scalar_one_or_none()
+
+    async def _aclose_owned_providers(self) -> None:
+        if not self._owns_providers:
+            return
+
+        for provider in self._providers.values():
+            maybe_aclose = getattr(provider, "aclose", None)
+            if maybe_aclose is None:
+                continue
+            close_result = maybe_aclose()
+            if inspect.isawaitable(close_result):
+                await close_result

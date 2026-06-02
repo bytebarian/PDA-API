@@ -55,6 +55,33 @@ class _NanProvider:
         return True
 
 
+class _CloseTrackingProvider:
+    name = "fake"
+
+    def __init__(self) -> None:
+        self.closed_count = 0
+
+    async def embed_texts(
+        self,
+        texts: list[str],
+        *,
+        model: str,
+        dimensions: int | None = None,
+        truncate: bool = True,
+    ) -> list[EmbeddingResult]:
+        del model, dimensions, truncate
+        return [
+            EmbeddingResult(text_index=index, vector=[1.0] * 1536, model="fake-model", dimensions=1536)
+            for index, _ in enumerate(texts)
+        ]
+
+    async def healthcheck(self) -> bool:
+        return True
+
+    async def aclose(self) -> None:
+        self.closed_count += 1
+
+
 async def test_embedding_service_rejects_documents_with_no_chunks(db_session) -> None:
     document = Document(filename="no-chunks.txt", status="awaiting", extracted_text="hello")
     db_session.add(document)
@@ -122,3 +149,27 @@ async def test_embedding_service_rejects_nan_vectors(db_session) -> None:
 
     with pytest.raises(InvalidEmbeddingVectorError, match="finite number"):
         await service.generate_embeddings_for_document(document.id)
+
+
+async def test_embedding_service_closes_owned_provider_after_generation(
+    db_session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    document = Document(filename="close-provider.txt", status="awaiting", extracted_text="hello world")
+    db_session.add(document)
+    await db_session.flush()
+    db_session.add(DocumentChunk(document_id=document.id, chunk_index=0, content="first"))
+    await db_session.commit()
+
+    provider = _CloseTrackingProvider()
+    monkeypatch.setattr(
+        "app.services.embedding_service.build_embedding_providers",
+        lambda settings: {"fake": provider},
+    )
+    service = EmbeddingService(
+        db_session,
+        settings=Settings(embedding_provider="fake", embedding_model="fake-model"),
+    )
+
+    await service.generate_embeddings_for_document(document.id)
+
+    assert provider.closed_count == 1
