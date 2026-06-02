@@ -45,6 +45,14 @@ class Document(Base):
     )
     extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summary_model: Mapped[str | None] = mapped_column(String, nullable=True)
+    summary_generated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    summary_status: Mapped[str] = mapped_column(
+        String, nullable=False, default="pending"
+    )
+    summary_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     embedding_model: Mapped[str | None] = mapped_column(String, nullable=True)
     last_indexed_at: Mapped[datetime | None] = mapped_column(

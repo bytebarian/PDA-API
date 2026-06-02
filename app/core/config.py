@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     embedding_truncate: bool = True
     ollama_base_url: str = "http://localhost:11434"
 
+    # Summarization settings
+    summarization_provider: str = "ollama"
+    summarization_model: str = "llama3.2:3b"
+    summary_max_input_chars: int = 12000
+    summary_max_output_chars: int = 600
+    ollama_timeout_seconds: int = 120
+
     # Text normalization settings
     text_normalization_enabled: bool = True
     text_normalization_unicode_form: str = "NFKC"
@@ -116,6 +123,9 @@ class Settings(BaseSettings):
         "embedding_dimensions",
         "embedding_batch_size",
         "embedding_timeout_seconds",
+        "summary_max_input_chars",
+        "summary_max_output_chars",
+        "ollama_timeout_seconds",
     )
     @classmethod
     def must_be_positive(cls, value: int) -> int:
