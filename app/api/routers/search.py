@@ -77,8 +77,9 @@ def get_search_service(
     summary="Semantic search over document chunks",
     description=(
         "Embed the query with the configured embedding provider and return the "
-        "most relevant document chunks ordered by vector similarity.  "
-        "Only documents with status ``ready`` are searched."
+        "most relevant document chunks ordered by vector similarity. "
+        "Document-level metadata filters are applied before vector ordering. "
+        "By default, only documents with status ``ready`` are searched."
     ),
 )
 async def semantic_search(

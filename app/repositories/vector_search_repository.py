@@ -22,6 +22,8 @@ def bounded_search_limit(limit: int) -> int:
 
 
 def cosine_distance(left: list[float], right: list[float]) -> float:
+    if len(left) != len(right):
+        return 1.0
     dot_product = sum(a * b for a, b in zip(left, right, strict=True))
     left_norm = math.sqrt(sum(value * value for value in left))
     right_norm = math.sqrt(sum(value * value for value in right))

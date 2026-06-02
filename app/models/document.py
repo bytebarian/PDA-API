@@ -96,4 +96,9 @@ class Document(Base):
 
     __table_args__ = (
         Index("ix_documents_checksum_sha256", "checksum_sha256"),
+        Index("ix_documents_status", "status"),
+        Index("ix_documents_category", "category"),
+        Index("ix_documents_file_type", "file_type"),
+        Index("ix_documents_created_at", "created_at"),
+        Index("ix_documents_updated_at", "updated_at"),
     )

@@ -6,17 +6,16 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import Select
+from sqlalchemy import Select, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.status import DocumentStatus
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.repositories.vector_search_repository import (
     bounded_search_limit,
-    build_chunk_document_statement,
     cosine_distance,
 )
+from app.schemas.search_filters import SearchFilters
 from app.services.vector_validation import similarity_from_cosine_distance
 
 
@@ -40,6 +39,22 @@ class ChunkSearchRow:
     distance: float
 
 
+@dataclass
+class ChunkSearchDiagnostics:
+    """Counts describing search scope before and after vector ranking."""
+
+    candidate_document_count: int
+    candidate_chunk_count: int
+
+
+@dataclass
+class ChunkSearchResult:
+    """Semantic search rows plus candidate diagnostics."""
+
+    rows: list[ChunkSearchRow]
+    diagnostics: ChunkSearchDiagnostics
+
+
 class ChunkRepository:
     """Repository for semantic similarity search over document chunks."""
 
@@ -51,12 +66,13 @@ class ChunkRepository:
         query_embedding: list[float],
         *,
         limit: int = 10,
+        search_filters: SearchFilters | None = None,
         document_ids: list[uuid.UUID] | None = None,
         min_score: float | None = None,
         categories: list[str] | None = None,
         file_types: list[str] | None = None,
         embedding_model: str | None = None,
-    ) -> list[ChunkSearchRow]:
+    ) -> ChunkSearchResult:
         """Search chunks by vector similarity, returning at most *limit* rows.
 
         Only chunks belonging to documents with status ``ready`` are
@@ -65,28 +81,48 @@ class ChunkRepository:
         ``chunk_index`` as a stable tie-breaker.
         """
         bounded_limit = bounded_search_limit(limit)
+        if search_filters is None:
+            effective_filters = SearchFilters(
+                document_ids=document_ids,
+                categories=categories,
+                file_types=file_types,
+            )
+        else:
+            effective_filters = search_filters.model_copy(deep=True)
+            if effective_filters.document_ids is None and document_ids is not None:
+                effective_filters.document_ids = document_ids
+            if effective_filters.categories is None and categories is not None:
+                effective_filters.categories = categories
+            if effective_filters.file_types is None and file_types is not None:
+                effective_filters.file_types = file_types
         if self._db.bind is None:
             raise RuntimeError("Database session is not bound to an engine")
         dialect = self._db.bind.dialect.name
-        if dialect == "postgresql":
-            return await self._search_postgres(
-                query_embedding=query_embedding,
-                limit=bounded_limit,
-                document_ids=document_ids,
-                min_score=min_score,
-                categories=categories,
-                file_types=file_types,
-                embedding_model=embedding_model,
-            )
-        return await self._search_generic(
-            query_embedding=query_embedding,
-            limit=bounded_limit,
-            document_ids=document_ids,
-            min_score=min_score,
-            categories=categories,
-            file_types=file_types,
+        base_statement = self._base_statement(
+            search_filters=effective_filters,
             embedding_model=embedding_model,
+            embedding_dimensions=len(query_embedding),
         )
+        diagnostics = await self._candidate_diagnostics(base_statement)
+
+        if diagnostics.candidate_chunk_count == 0:
+            return ChunkSearchResult(rows=[], diagnostics=diagnostics)
+
+        if dialect == "postgresql":
+            rows = await self._search_postgres(
+                query_embedding=query_embedding,
+                base_statement=base_statement,
+                limit=bounded_limit,
+                min_score=min_score,
+            )
+        else:
+            rows = await self._search_generic(
+                query_embedding=query_embedding,
+                base_statement=base_statement,
+                limit=bounded_limit,
+                min_score=min_score,
+            )
+        return ChunkSearchResult(rows=rows, diagnostics=diagnostics)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -95,40 +131,92 @@ class ChunkRepository:
     def _base_statement(
         self,
         *,
-        document_ids: list[uuid.UUID] | None,
-        categories: list[str] | None,
-        file_types: list[str] | None,
+        search_filters: SearchFilters,
         embedding_model: str | None,
+        embedding_dimensions: int,
     ) -> Select[tuple[DocumentChunk, Document]]:
-        return build_chunk_document_statement(
-            document_columns=(Document,),
-            document_ids=document_ids,
-            categories=categories,
-            file_types=file_types,
-            document_status=DocumentStatus.ready.value,
-            embedding_model=embedding_model,
+        statement: Select[tuple[DocumentChunk, Document]] = (
+            select(DocumentChunk, Document)
+            .join(Document, Document.id == DocumentChunk.document_id)
+            .where(DocumentChunk.embedding.is_not(None))
+            .where(DocumentChunk.embedding_dimension == embedding_dimensions)
+            .where(Document.status.in_(search_filters.resolved_statuses()))
+        )
+        if search_filters.document_ids:
+            statement = statement.where(DocumentChunk.document_id.in_(search_filters.document_ids))
+        if search_filters.categories:
+            statement = statement.where(Document.category.in_(search_filters.categories))
+        if search_filters.file_types:
+            statement = statement.where(Document.file_type.in_(search_filters.file_types))
+        if search_filters.filename_contains:
+            statement = statement.where(
+                Document.filename.ilike(
+                    f"%{self._escape_like(search_filters.filename_contains)}%",
+                    escape="\\",
+                )
+            )
+        if search_filters.created_from:
+            statement = statement.where(Document.created_at >= search_filters.created_from)
+        if search_filters.created_to:
+            statement = statement.where(Document.created_at < search_filters.created_to)
+        if search_filters.modified_from:
+            statement = statement.where(Document.updated_at >= search_filters.modified_from)
+        if search_filters.modified_to:
+            statement = statement.where(Document.updated_at < search_filters.modified_to)
+        if search_filters.metadata:
+            dialect = self._db.bind.dialect.name if self._db.bind is not None else None
+            if dialect == "postgresql":
+                statement = statement.where(
+                    Document.metadata_jsonb.contains(search_filters.metadata)
+                )
+            else:
+                for key, value in search_filters.metadata.items():
+                    statement = statement.where(
+                        func.json_extract(Document.metadata_jsonb, f'$."{key}"') == value
+                    )
+        if embedding_model:
+            statement = statement.where(DocumentChunk.embedding_model == embedding_model)
+        return statement
+
+    @staticmethod
+    def _escape_like(value: str) -> str:
+        return (
+            value.replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+
+    async def _candidate_diagnostics(
+        self,
+        base_statement: Select[tuple[DocumentChunk, Document]],
+    ) -> ChunkSearchDiagnostics:
+        scope = base_statement.subquery()
+        counts_stmt = (
+            select(
+                func.count().label("chunk_count"),
+                func.count(distinct(scope.c.document_id)).label("document_count"),
+            )
+            .select_from(scope)
+        )
+        counts = (await self._db.execute(counts_stmt)).one()
+        candidate_chunk_count = int(counts.chunk_count)
+        candidate_document_count = int(counts.document_count)
+        return ChunkSearchDiagnostics(
+            candidate_document_count=candidate_document_count,
+            candidate_chunk_count=candidate_chunk_count,
         )
 
     async def _search_postgres(
         self,
         *,
         query_embedding: list[float],
+        base_statement: Select[tuple[DocumentChunk, Document]],
         limit: int,
-        document_ids: list[uuid.UUID] | None,
         min_score: float | None,
-        categories: list[str] | None,
-        file_types: list[str] | None,
-        embedding_model: str | None,
     ) -> list[ChunkSearchRow]:
         distance_expr = DocumentChunk.embedding.cosine_distance(query_embedding)
         statement = (
-            self._base_statement(
-                document_ids=document_ids,
-                categories=categories,
-                file_types=file_types,
-                embedding_model=embedding_model,
-            )
-            .where(DocumentChunk.embedding_dimension == len(query_embedding))
+            base_statement
             .add_columns(distance_expr.label("distance"))
         )
         if min_score is not None and min_score > 0.0:
@@ -166,26 +254,18 @@ class ChunkRepository:
         self,
         *,
         query_embedding: list[float],
+        base_statement: Select[tuple[DocumentChunk, Document]],
         limit: int,
-        document_ids: list[uuid.UUID] | None,
         min_score: float | None,
-        categories: list[str] | None,
-        file_types: list[str] | None,
-        embedding_model: str | None,
     ) -> list[ChunkSearchRow]:
-        statement = self._base_statement(
-            document_ids=document_ids,
-            categories=categories,
-            file_types=file_types,
-            embedding_model=embedding_model,
-        )
-
-        rows = (await self._db.execute(statement)).all()
+        rows = (await self._db.execute(base_statement)).all()
 
         scored: list[ChunkSearchRow] = []
         for chunk, doc in rows:
             embedding = chunk.embedding
-            if embedding is None or len(embedding) != len(query_embedding):
+            if embedding is None:
+                continue
+            if len(embedding) != len(query_embedding):
                 continue
             distance = cosine_distance(list(embedding), query_embedding)
             score = similarity_from_cosine_distance(distance)
