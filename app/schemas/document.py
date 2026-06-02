@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.status import DocumentStatus, ProcessingJobStage, ProcessingJobStatus
 
@@ -87,8 +87,8 @@ class DocumentSummary(BaseModel):
     summary: str | None
     summary_status: str | None
     summary_generated_at: datetime | None
-    category_status: str | None
-    category_source: str | None
+    category_status: str | None = Field(serialization_alias="categoryStatus")
+    category_source: str | None = Field(serialization_alias="categorySource")
     category_confidence: float | None
     category_generated_at: datetime | None
     created_at: datetime
@@ -127,8 +127,8 @@ class DocumentDetail(BaseModel):
     summary_generated_at: datetime | None
     summary_status: str | None
     summary_error: str | None
-    category_status: str | None
-    category_source: str | None
+    category_status: str | None = Field(serialization_alias="categoryStatus")
+    category_source: str | None = Field(serialization_alias="categorySource")
     category_confidence: float | None
     category_reason: str | None
     category_model: str | None

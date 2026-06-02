@@ -387,8 +387,8 @@ async def test_document_list_exposes_category_fields(
     assert len(items) >= 1
     item = next(i for i in items if i["filename"] == "api-category-test.pdf")
     assert item["category"] == "invoice"
-    assert item["category_status"] == "ready"
-    assert item["category_source"] == "rules"
+    assert item["categoryStatus"] == "ready"
+    assert item["categorySource"] == "rules"
     assert item["category_confidence"] == pytest.approx(0.87, abs=1e-4)
 
 
@@ -414,8 +414,8 @@ async def test_document_detail_exposes_category_fields(
     assert response.status_code == 200
     body = response.json()
     assert body["category"] == "contract"
-    assert body["category_status"] == "ready"
-    assert body["category_source"] == "rules"
+    assert body["categoryStatus"] == "ready"
+    assert body["categorySource"] == "rules"
     assert body["category_confidence"] == pytest.approx(0.75, abs=1e-4)
     assert body["category_reason"] is not None
     assert "category_generated_at" in body
