@@ -13,8 +13,6 @@ from app.adapters.embeddings import (
     EmbeddingProvider,
     EmbeddingProviderError,
     EmbeddingProviderUnavailableError,
-    FakeEmbeddingProvider,
-    OllamaEmbeddingProvider,
 )
 from app.core.config import Settings, get_settings
 from app.models.app_settings import AppSettings
