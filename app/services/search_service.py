@@ -214,8 +214,12 @@ class SearchService:
         raw_dimensions: int | None = (
             persisted.embedding_dimensions if persisted else None
         )
-        dimensions: int = raw_dimensions if raw_dimensions is not None else self._settings.embedding_dimensions
-        if not provider or not model or not dimensions:
+        dimensions: int = (
+            raw_dimensions
+            if raw_dimensions is not None
+            else self._settings.embedding_dimensions
+        )
+        if not provider or not model or dimensions <= 0:
             raise SearchConfigurationError(
                 "Embedding provider, model, and dimensions must be configured"
             )
