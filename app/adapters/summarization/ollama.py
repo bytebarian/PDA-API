@@ -133,7 +133,7 @@ class OllamaSummarizationProvider:
         )
 
     async def healthcheck(self) -> bool:
-        """Return True when Ollama responds to a HEAD /api/tags request."""
+        """Return True when Ollama responds to a GET /api/tags request."""
         client = await self._get_client()
         try:
             response = await client.get("/api/tags")
