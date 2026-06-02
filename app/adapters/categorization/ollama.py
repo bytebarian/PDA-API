@@ -142,7 +142,7 @@ class OllamaCategorizationProvider:
             data = response.json()
         except Exception as exc:
             raise CategorizationProviderResponseError(
-                f"Ollama returned non-JSON envelope: {response.text[:200]}"
+                "Ollama returned a non-JSON response envelope during categorization"
             ) from exc
 
         raw_response = data.get("response", "").strip()
