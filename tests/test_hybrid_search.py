@@ -703,6 +703,32 @@ async def test_hybrid_search_includes_both_retrieval_diagnostics(
 
 
 @pytest.mark.asyncio
+async def test_hybrid_search_candidate_counts_include_full_text_only_matches(
+    db_session: AsyncSession,
+) -> None:
+    doc = await _seed_doc(db_session, filename="notes.md")
+    await _seed_chunk(
+        db_session,
+        doc.id,
+        content="energy tariff G11 consumer agreement",
+        embedding=None,
+    )
+    await db_session.commit()
+
+    service = HybridSearchService(
+        db_session,
+        providers=_make_fake_providers(),
+        settings=_make_settings(),
+    )
+    response = await service.hybrid_search(HybridSearchRequest(query="energy tariff G11"))
+
+    assert response.vector_candidate_count == 0
+    assert response.full_text_candidate_count > 0
+    assert response.candidate_chunk_count >= response.full_text_candidate_count
+    assert response.candidate_document_count >= 1
+
+
+@pytest.mark.asyncio
 async def test_hybrid_search_result_has_scoring_diagnostics(
     db_session: AsyncSession,
 ) -> None:

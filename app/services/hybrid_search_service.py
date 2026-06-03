@@ -352,8 +352,19 @@ class HybridSearchService:
             search_filters=effective_filters,
         )
 
-        # Use vector diagnostics as the authoritative candidate scope
+        # Use vector diagnostics as baseline, but ensure candidate counts stay
+        # consistent when full-text returns chunks lacking embeddings.
         diagnostics = vector_search_result.diagnostics
+        full_text_candidate_chunk_count = len({row.chunk_id for row in ft_rows})
+        full_text_candidate_document_count = len({row.document_id for row in ft_rows})
+        candidate_chunk_count = max(
+            diagnostics.candidate_chunk_count,
+            full_text_candidate_chunk_count,
+        )
+        candidate_document_count = max(
+            diagnostics.candidate_document_count,
+            full_text_candidate_document_count,
+        )
 
         # --- Fuse ---
         fused = _fuse_results(
@@ -378,8 +389,8 @@ class HybridSearchService:
                 "query_length": len(request.query),
                 "top_k": request.top_k,
                 "fusion_strategy": request.fusion_strategy,
-                "candidate_document_count": diagnostics.candidate_document_count,
-                "candidate_chunk_count": diagnostics.candidate_chunk_count,
+                "candidate_document_count": candidate_document_count,
+                "candidate_chunk_count": candidate_chunk_count,
                 "vector_candidate_count": len(vector_rows),
                 "full_text_candidate_count": len(ft_rows),
                 "result_count": len(fused),
@@ -427,8 +438,8 @@ class HybridSearchService:
             fusion_strategy=request.fusion_strategy,
             embedding_model=actual_model,
             filters_applied=effective_filters.filters_applied(),
-            candidate_document_count=diagnostics.candidate_document_count,
-            candidate_chunk_count=diagnostics.candidate_chunk_count,
+            candidate_document_count=candidate_document_count,
+            candidate_chunk_count=candidate_chunk_count,
             vector_candidate_count=len(vector_rows),
             full_text_candidate_count=len(ft_rows),
             result_count=len(results),
