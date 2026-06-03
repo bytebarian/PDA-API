@@ -182,6 +182,11 @@ class ContextBuilderService:
 
         prefix, suffix = self._context_wrappers(template, context_style, query=query)
 
+        base_context = self._render_context(prefix, [], suffix)
+        if len(base_context) > max_characters:
+            raise ValueError("max_characters is too small to fit context wrappers")
+        if max_tokens is not None and self._token_estimator.estimate(base_context) > max_tokens:
+            raise ValueError("max_tokens is too small to fit context wrappers")
         included_blocks: list[str] = []
         sources: list[ContextSource] = []
         truncated = False
