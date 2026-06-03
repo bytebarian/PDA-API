@@ -12,13 +12,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.repositories.vector_search_repository import (
-    bounded_search_limit,
     cosine_distance,
 )
 from app.schemas.search_filters import SearchFilters
 from app.services.vector_validation import similarity_from_cosine_distance
 
 _MAX_FULL_TEXT_LIMIT = 200
+_MAX_SEMANTIC_LIMIT = 200
 
 
 @dataclass
@@ -101,7 +101,7 @@ class ChunkRepository:
         ordered by ascending cosine distance (most similar first), with
         ``chunk_index`` as a stable tie-breaker.
         """
-        bounded_limit = bounded_search_limit(limit)
+        bounded_limit = min(max(limit, 1), _MAX_SEMANTIC_LIMIT)
         if search_filters is None:
             effective_filters = SearchFilters(
                 document_ids=document_ids,

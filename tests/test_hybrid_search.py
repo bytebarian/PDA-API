@@ -729,6 +729,40 @@ async def test_hybrid_search_candidate_counts_include_full_text_only_matches(
 
 
 @pytest.mark.asyncio
+async def test_hybrid_search_honors_vector_top_k_above_50(
+    db_session: AsyncSession,
+) -> None:
+    doc = await _seed_doc(db_session, filename="vector-heavy.pdf")
+    embedding = [0.1, 0.2, 0.3, 0.4]
+    for index in range(90):
+        await _seed_chunk(
+            db_session,
+            doc.id,
+            chunk_index=index,
+            content=f"content-{index}",
+            embedding=embedding,
+        )
+    await db_session.commit()
+
+    service = HybridSearchService(
+        db_session,
+        providers=_make_fake_providers(),
+        settings=_make_settings(),
+    )
+    response = await service.hybrid_search(
+        HybridSearchRequest(
+            query="unmatched-terms",
+            top_k=10,
+            vector_top_k=80,
+            full_text_top_k=10,
+        )
+    )
+
+    assert response.vector_candidate_count == 80
+    assert response.full_text_candidate_count == 0
+
+
+@pytest.mark.asyncio
 async def test_hybrid_search_result_has_scoring_diagnostics(
     db_session: AsyncSession,
 ) -> None:
