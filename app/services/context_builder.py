@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+import sys
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -24,7 +25,7 @@ from app.schemas.search import SemanticSearchResult
 
 DEFAULT_MAX_CHUNKS = 12
 DEFAULT_MAX_CHARACTERS = 12000
-_MISSING_SORT_SENTINEL = 10**9
+_MISSING_SORT_SENTINEL = sys.maxsize
 _ExcludedReason = Literal[
     "budget_exceeded",
     "max_chunks_exceeded",
@@ -337,7 +338,10 @@ class ContextBuilderService:
                 duplicate_index = seen_text[text_key]
 
             if duplicate_reason is not None and duplicate_index is not None:
-                self._merge_preferred(deduped[duplicate_index], normalized)
+                deduped[duplicate_index] = self._merge_preferred(
+                    deduped[duplicate_index],
+                    normalized,
+                )
                 excluded.append(
                     ExcludedContextChunk(
                         chunk_id=normalized.chunk_id,
@@ -357,10 +361,11 @@ class ContextBuilderService:
 
     def _merge_preferred(
         self, current: RetrievalResultForContext, incoming: RetrievalResultForContext
-    ) -> None:
-        """Mutate *current* with stronger score and missing non-null incoming fields."""
+    ) -> RetrievalResultForContext:
+        """Return merged duplicate candidate with preferred score and complete fields."""
+        merged = current.model_dump(mode="python")
         if (incoming.score or 0.0) > (current.score or 0.0):
-            current.score = incoming.score
+            merged["score"] = incoming.score
 
         for attr in (
             "document_path",
@@ -372,16 +377,14 @@ class ContextBuilderService:
             "text",
             "excerpt",
         ):
-            if getattr(current, attr) in (None, "") and getattr(incoming, attr) not in (
-                None,
-                "",
-            ):
-                setattr(current, attr, getattr(incoming, attr))
+            if merged.get(attr) in (None, "") and getattr(incoming, attr) not in (None, ""):
+                merged[attr] = getattr(incoming, attr)
 
         if incoming.metadata:
             # Keep existing metadata keys authoritative while still filling missing
             # keys from duplicates discovered in alternate retrieval paths.
-            current.metadata = {**incoming.metadata, **current.metadata}
+            merged["metadata"] = {**incoming.metadata, **current.metadata}
+        return RetrievalResultForContext.model_validate(merged)
 
     def _context_wrappers(
         self,
