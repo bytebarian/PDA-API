@@ -360,19 +360,15 @@ class HybridSearchService:
             search_filters=effective_filters,
         )
 
-        # Use vector diagnostics as baseline, but ensure candidate counts stay
-        # consistent when full-text returns chunks lacking embeddings.
-        diagnostics = vector_search_result.diagnostics
-        full_text_candidate_chunk_count = len({row.chunk_id for row in ft_rows})
-        full_text_candidate_document_count = len({row.document_id for row in ft_rows})
-        candidate_chunk_count = max(
-            diagnostics.candidate_chunk_count,
-            full_text_candidate_chunk_count,
-        )
-        candidate_document_count = max(
-            diagnostics.candidate_document_count,
-            full_text_candidate_document_count,
-        )
+        # Candidate diagnostics for the fused result set (unique chunks/documents
+        # returned by either retrieval path).
+        vector_candidate_chunk_ids = {row.chunk_id for row in vector_rows}
+        ft_candidate_chunk_ids = {row.chunk_id for row in ft_rows}
+        vector_candidate_doc_ids = {row.document_id for row in vector_rows}
+        ft_candidate_doc_ids = {row.document_id for row in ft_rows}
+
+        candidate_chunk_count = len(vector_candidate_chunk_ids | ft_candidate_chunk_ids)
+        candidate_document_count = len(vector_candidate_doc_ids | ft_candidate_doc_ids)
 
         # --- Fuse ---
         fused = _fuse_results(
