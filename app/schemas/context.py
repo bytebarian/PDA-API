@@ -166,7 +166,7 @@ class ContextBuildRequest(BaseModel):
     max_chunks: int = Field(default=DEFAULT_CONTEXT_MAX_CHUNKS, ge=1, le=50)
     max_characters: int = Field(
         default=DEFAULT_CONTEXT_MAX_CHARACTERS,
-        ge=1000,
+        ge=1,
         le=100000,
         validation_alias=AliasChoices("max_characters", "maxCharacters"),
     )
