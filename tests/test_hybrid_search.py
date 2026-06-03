@@ -171,7 +171,7 @@ def test_request_accepts_valid_defaults() -> None:
     assert req.full_text_weight == 0.35
     assert req.vector_top_k is None
     assert req.full_text_top_k is None
-    assert req.filters is not None or req.filters is None  # either is ok at parse time
+    assert req.filters is None
 
 
 def test_request_resolved_filters_defaults_to_ready_status() -> None:
