@@ -389,6 +389,32 @@ def test_fusion_full_text_only_chunk_included() -> None:
     assert fused[0].vector_rank is None
 
 
+def test_fusion_drops_vector_only_chunks_when_vector_weight_zero() -> None:
+    vector_only = _make_chunk_row()
+    full_text_only = _make_ft_row()
+    fused = _fuse_results(
+        [vector_only],
+        [full_text_only],
+        strategy="rrf",
+        vector_weight=0.0,
+        full_text_weight=1.0,
+    )
+    assert [entry.chunk_id for entry in fused] == [full_text_only.chunk_id]
+
+
+def test_fusion_drops_full_text_only_chunks_when_full_text_weight_zero() -> None:
+    vector_only = _make_chunk_row()
+    full_text_only = _make_ft_row()
+    fused = _fuse_results(
+        [vector_only],
+        [full_text_only],
+        strategy="rrf",
+        vector_weight=1.0,
+        full_text_weight=0.0,
+    )
+    assert [entry.chunk_id for entry in fused] == [vector_only.chunk_id]
+
+
 def test_fusion_empty_both_sources() -> None:
     fused = _fuse_results(
         [],

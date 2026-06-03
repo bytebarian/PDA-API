@@ -214,6 +214,20 @@ def _fuse_results(
                 full_text_weight=full_text_weight,
             )
 
+    # Drop candidates that come exclusively from a disabled retrieval source.
+    filtered_entries = [
+        entry
+        for entry in entries.values()
+        if not (
+            (vector_weight == 0.0 and entry.vector_rank is not None and entry.full_text_rank is None)
+            or (
+                full_text_weight == 0.0
+                and entry.full_text_rank is not None
+                and entry.vector_rank is None
+            )
+        )
+    ]
+
     # Stable sort: score desc → best source rank asc → document_id asc → chunk_index asc
     def _sort_key(e: _FusionEntry) -> tuple:  # type: ignore[type-arg]
         best_rank = min(
@@ -221,7 +235,7 @@ def _fuse_results(
         )
         return (-e.score, best_rank, str(e.document_id), e.chunk_index)
 
-    return sorted(entries.values(), key=_sort_key)
+    return sorted(filtered_entries, key=_sort_key)
 
 
 # ---------------------------------------------------------------------------
