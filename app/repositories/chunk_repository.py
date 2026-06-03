@@ -101,7 +101,7 @@ class ChunkRepository:
         ordered by ascending cosine distance (most similar first), with
         ``chunk_index`` as a stable tie-breaker.
         """
-        bounded_limit = min(max(limit, 1), _MAX_SEMANTIC_LIMIT)
+        clamped_limit = min(max(limit, 1), _MAX_SEMANTIC_LIMIT)
         if search_filters is None:
             effective_filters = SearchFilters(
                 document_ids=document_ids,
@@ -133,14 +133,14 @@ class ChunkRepository:
             rows = await self._search_postgres(
                 query_embedding=query_embedding,
                 base_statement=base_statement,
-                limit=bounded_limit,
+                limit=clamped_limit,
                 min_score=min_score,
             )
         else:
             rows = await self._search_generic(
                 query_embedding=query_embedding,
                 base_statement=base_statement,
-                limit=bounded_limit,
+                limit=clamped_limit,
                 min_score=min_score,
             )
         return ChunkSearchResult(rows=rows, diagnostics=diagnostics)
