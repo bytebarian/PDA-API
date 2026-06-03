@@ -2,6 +2,7 @@
 
 Exposes:
   POST /search/semantic  – natural-language semantic search over document chunks
+  POST /search/hybrid    – hybrid retrieval combining vector + full-text search
 """
 
 from __future__ import annotations
@@ -15,8 +16,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.embeddings import EmbeddingProvider
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
+from app.schemas.hybrid_search import HybridSearchRequest, HybridSearchResponse
 from app.schemas.search import SemanticSearchRequest, SemanticSearchResponse
 from app.services.embedding_service import build_embedding_providers
+from app.services.hybrid_search_service import HybridSearchService
 from app.services.search_service import (
     EmbeddingProviderNotAvailableError,
     SearchConfigurationError,
@@ -71,6 +74,17 @@ def get_search_service(
     )
 
 
+def get_hybrid_search_service(
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> HybridSearchService:
+    return HybridSearchService(
+        db,
+        providers=_get_shared_providers(settings),
+        settings=settings,
+    )
+
+
 @router.post(
     "/semantic",
     response_model=SemanticSearchResponse,
@@ -103,6 +117,45 @@ async def semantic_search(
         ) from exc
     except SearchServiceError as exc:
         logger.error("Search service error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred during search.",
+        ) from exc
+
+
+@router.post(
+    "/hybrid",
+    response_model=HybridSearchResponse,
+    summary="Hybrid search over document chunks",
+    description=(
+        "Combine vector similarity search and PostgreSQL full-text search to "
+        "retrieve the most relevant document chunks. Metadata filters are applied "
+        "before both retrieval paths. Results are fused using Reciprocal Rank "
+        "Fusion (RRF) by default. By default, only documents with status "
+        "``ready`` are searched."
+    ),
+)
+async def hybrid_search(
+    request: HybridSearchRequest,
+    service: HybridSearchService = Depends(get_hybrid_search_service),
+) -> HybridSearchResponse:
+    """Run hybrid search and return ranked chunk results with diagnostics."""
+    try:
+        return await service.hybrid_search(request)
+    except EmbeddingProviderNotAvailableError as exc:
+        logger.warning("Embedding provider unavailable during hybrid search: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Embedding provider is currently unavailable. Please try again later.",
+        ) from exc
+    except SearchConfigurationError as exc:
+        logger.error("Hybrid search configuration error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Search is not configured on this server.",
+        ) from exc
+    except SearchServiceError as exc:
+        logger.error("Hybrid search service error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred during search.",
