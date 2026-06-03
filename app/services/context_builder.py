@@ -330,23 +330,15 @@ class ContextBuilderService:
             resolved_text, _ = _resolve_text(normalized)
             text_key = _normalize_text_for_dedupe(resolved_text) if resolved_text else None
 
-            duplicate_reason: _ExcludedReason | None = None
-            duplicate_index: int | None = None
-            if chunk_key in seen_chunk_ids:
-                duplicate_reason = "duplicate_chunk_id"
-                duplicate_index = seen_chunk_ids[chunk_key]
-            elif doc_chunk_key in seen_document_chunk:
-                duplicate_reason = "duplicate_document_chunk"
-                duplicate_index = seen_document_chunk[doc_chunk_key]
-            elif text_key and text_key in seen_text:
-                duplicate_reason = "duplicate_text"
-                duplicate_index = seen_text[text_key]
-
             if duplicate_reason is not None and duplicate_index is not None:
-                deduped[duplicate_index] = self._merge_preferred(
-                    deduped[duplicate_index],
-                    normalized,
-                )
+                # Only merge duplicates that refer to the same underlying chunk identity.
+                # For duplicate_text (same content but potentially different chunk IDs/docs),
+                # do not merge scores/metadata into the kept chunk.
+                if duplicate_reason != "duplicate_text":
+                    deduped[duplicate_index] = self._merge_preferred(
+                        deduped[duplicate_index],
+                        normalized,
+                    )
                 excluded.append(
                     ExcludedContextChunk(
                         chunk_id=normalized.chunk_id,
