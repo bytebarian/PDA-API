@@ -485,23 +485,6 @@ class ContextBuilderService:
             ):
                 best = (candidate_block, included_len)
                 low = mid + 1
-                source_id,
-                item,
-                maybe_text,
-                include_metadata=include_metadata,
-                include_scores=include_scores,
-                excerpt_only=excerpt_only,
-            )
-            if self._fits_budget(
-                prefix,
-                blocks,
-                candidate_block,
-                suffix,
-                max_characters=max_characters,
-                max_tokens=max_tokens,
-            ):
-                best = (candidate_block, len(maybe_text))
-                low = mid + 1
             else:
                 high = mid - 1
 
