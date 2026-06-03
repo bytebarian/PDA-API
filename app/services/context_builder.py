@@ -464,9 +464,27 @@ class ContextBuilderService:
             if not maybe_text:
                 low = mid + 1
                 continue
-            if len(maybe_text) < len(text):
+            included_len = len(maybe_text)
+            if included_len < len(text):
                 maybe_text = f"{maybe_text}\n[...]"
             candidate_block = self._format_block(
+                source_id,
+                item,
+                maybe_text,
+                include_metadata=include_metadata,
+                include_scores=include_scores,
+                excerpt_only=excerpt_only,
+            )
+            if self._fits_budget(
+                prefix,
+                blocks,
+                candidate_block,
+                suffix,
+                max_characters=max_characters,
+                max_tokens=max_tokens,
+            ):
+                best = (candidate_block, included_len)
+                low = mid + 1
                 source_id,
                 item,
                 maybe_text,
