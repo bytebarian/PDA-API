@@ -335,9 +335,13 @@ class ChunkRepository:
         On SQLite (used in tests), a case-insensitive ``LIKE`` match is used as
         a fallback so unit tests remain runnable without PostgreSQL.
         """
-        effective_filters = search_filters if search_filters is not None else SearchFilters()
+        query = query.strip()
+        if not query:
+            return []
+        effective_filters = (
+            search_filters if search_filters is not None else SearchFilters()
+        )
         bounded_limit = min(max(1, limit), _MAX_FULL_TEXT_LIMIT)
-
         if self._db.bind is None:
             raise RuntimeError("Database session is not bound to an engine")
         dialect = self._db.bind.dialect.name
