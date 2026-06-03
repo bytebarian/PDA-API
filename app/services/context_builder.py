@@ -358,7 +358,7 @@ class ContextBuilderService:
     def _merge_preferred(
         self, current: RetrievalResultForContext, incoming: RetrievalResultForContext
     ) -> None:
-        """Merge duplicate candidate details into *current* in place."""
+        """Mutate *current* with stronger score and missing non-null incoming fields."""
         if (incoming.score or 0.0) > (current.score or 0.0):
             current.score = incoming.score
 
@@ -379,6 +379,8 @@ class ContextBuilderService:
                 setattr(current, attr, getattr(incoming, attr))
 
         if incoming.metadata:
+            # Keep existing metadata keys authoritative while still filling missing
+            # keys from duplicates discovered in alternate retrieval paths.
             current.metadata = {**incoming.metadata, **current.metadata}
 
     def _context_wrappers(

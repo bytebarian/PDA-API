@@ -275,11 +275,12 @@ async def test_hybrid_search_result_schema_is_accepted(
 async def test_model_payload_can_be_passed_to_mock_model_client(
     service: ContextBuilderService,
 ) -> None:
+    query = "What is the notice period?"
     built = await service.build_context([_result(chunk_index=2)])
     payload = service.build_model_context_payload(
         built,
         context_style="chat",
-        query="What is the notice period?",
+        query=query,
     )
 
     captured: list[dict[str, str]] = []
@@ -294,7 +295,7 @@ async def test_model_payload_can_be_passed_to_mock_model_client(
             "role": "user",
             "content": (
                 f"Context:\n{payload.context_text}\n\n"
-                "Question:\nWhat is the notice period?"
+                f"Question:\n{query}"
             ),
         },
     ]
