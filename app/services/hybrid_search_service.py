@@ -288,7 +288,7 @@ class HybridSearchService:
 
         # --- Vector candidates ---
         vector_rows: list[ChunkSearchRow] = []
-        if v_weight > 0.0:
+        if request.vector_weight > 0.0:
             runtime = await self._resolve_runtime()
             provider = self._providers.get(runtime.provider)
             if provider is None:
@@ -360,7 +360,7 @@ class HybridSearchService:
 
         # --- Full-text candidates ---
         ft_rows: list[FullTextSearchRow] = []
-        if ft_weight > 0.0:
+        if request.full_text_weight > 0.0:
             ft_rows = await self._repository.full_text_candidates(
                 request.query,
                 limit=request.effective_full_text_top_k(),

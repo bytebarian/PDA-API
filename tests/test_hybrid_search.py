@@ -1059,12 +1059,14 @@ async def test_hybrid_search_full_text_heavy_weights(
 async def test_hybrid_search_full_text_only_skips_vector_path(
     db_session: AsyncSession,
 ) -> None:
-    unavailable = MagicMock()
-    unavailable.embed_texts = AsyncMock(side_effect=AssertionError("unexpected embed"))
+    unused_provider = MagicMock()
+    unused_provider.embed_texts = AsyncMock(
+        side_effect=AssertionError("unexpected embed")
+    )
 
     service = HybridSearchService(
         db_session,
-        providers={"fake": unavailable},
+        providers={"fake": unused_provider},
         settings=_make_settings(),
     )
     ft_row = _make_ft_row(content="PGE tariff G11 non-compete clause")
@@ -1083,7 +1085,7 @@ async def test_hybrid_search_full_text_only_skips_vector_path(
         )
     )
 
-    unavailable.embed_texts.assert_not_called()
+    unused_provider.embed_texts.assert_not_called()
     service._repository.semantic_search.assert_not_awaited()
     service._repository.full_text_candidates.assert_awaited_once()
     assert response.vector_candidate_count == 0
