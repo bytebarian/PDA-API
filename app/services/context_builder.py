@@ -24,6 +24,14 @@ from app.schemas.search import SemanticSearchResult
 
 DEFAULT_MAX_CHUNKS = 12
 DEFAULT_MAX_CHARACTERS = 12000
+_ExcludedReason = Literal[
+    "budget_exceeded",
+    "max_chunks_exceeded",
+    "missing_content",
+    "duplicate_chunk_id",
+    "duplicate_document_chunk",
+    "duplicate_text",
+]
 
 
 class ApproximateTokenEstimator:
@@ -307,7 +315,7 @@ class ContextBuilderService:
             resolved_text, _ = _resolve_text(normalized)
             text_key = _normalize_text_for_dedupe(resolved_text) if resolved_text else None
 
-            duplicate_reason: str | None = None
+            duplicate_reason: _ExcludedReason | None = None
             duplicate_index: int | None = None
             if chunk_key in seen_chunk_ids:
                 duplicate_reason = "duplicate_chunk_id"
