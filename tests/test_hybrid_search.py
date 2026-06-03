@@ -1055,6 +1055,85 @@ async def test_hybrid_search_full_text_heavy_weights(
     assert "full_text" in result.matched_by
 
 
+@pytest.mark.asyncio
+async def test_hybrid_search_full_text_only_skips_vector_path(
+    db_session: AsyncSession,
+) -> None:
+    unavailable = MagicMock()
+    unavailable.embed_texts = AsyncMock(side_effect=AssertionError("unexpected embed"))
+
+    service = HybridSearchService(
+        db_session,
+        providers={"fake": unavailable},
+        settings=_make_settings(),
+    )
+    ft_row = _make_ft_row(content="PGE tariff G11 non-compete clause")
+    service._repository.semantic_search = AsyncMock(  # type: ignore[method-assign]
+        side_effect=AssertionError("unexpected vector search")
+    )
+    service._repository.full_text_candidates = AsyncMock(  # type: ignore[method-assign]
+        return_value=[ft_row]
+    )
+
+    response = await service.hybrid_search(
+        HybridSearchRequest(
+            query="PGE tariff G11",
+            vector_weight=0.0,
+            full_text_weight=1.0,
+        )
+    )
+
+    unavailable.embed_texts.assert_not_called()
+    service._repository.semantic_search.assert_not_awaited()
+    service._repository.full_text_candidates.assert_awaited_once()
+    assert response.vector_candidate_count == 0
+    assert response.full_text_candidate_count == 1
+    assert response.results[0].matched_by == ["full_text"]
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_vector_only_skips_full_text_path(
+    db_session: AsyncSession,
+) -> None:
+    from app.repositories.chunk_repository import (
+        ChunkSearchDiagnostics,
+        ChunkSearchResult,
+    )
+
+    service = HybridSearchService(
+        db_session,
+        providers=_make_fake_providers(),
+        settings=_make_settings(),
+    )
+    vector_row = _make_chunk_row(content="PGE tariff G11 non-compete clause")
+    service._repository.semantic_search = AsyncMock(  # type: ignore[method-assign]
+        return_value=ChunkSearchResult(
+            rows=[vector_row],
+            diagnostics=ChunkSearchDiagnostics(
+                candidate_document_count=1,
+                candidate_chunk_count=1,
+            ),
+        )
+    )
+    service._repository.full_text_candidates = AsyncMock(  # type: ignore[method-assign]
+        side_effect=AssertionError("unexpected full-text search")
+    )
+
+    response = await service.hybrid_search(
+        HybridSearchRequest(
+            query="PGE tariff G11",
+            vector_weight=1.0,
+            full_text_weight=0.0,
+        )
+    )
+
+    service._repository.semantic_search.assert_awaited_once()
+    service._repository.full_text_candidates.assert_not_awaited()
+    assert response.vector_candidate_count == 1
+    assert response.full_text_candidate_count == 0
+    assert response.results[0].matched_by == ["vector"]
+
+
 # ---------------------------------------------------------------------------
 # API contract tests
 # ---------------------------------------------------------------------------

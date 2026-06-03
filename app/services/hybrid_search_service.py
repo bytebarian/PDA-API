@@ -276,13 +276,6 @@ class HybridSearchService:
         7. Take topK.
         8. Return citation-ready response with diagnostics.
         """
-        runtime = await self._resolve_runtime()
-        provider = self._providers.get(runtime.provider)
-        if provider is None:
-            raise SearchConfigurationError(
-                f"Unknown embedding provider '{runtime.provider}'"
-            )
-
         # Normalize weights
         weight_sum = request.vector_weight + request.full_text_weight
         v_weight = request.vector_weight / weight_sum
@@ -291,74 +284,88 @@ class HybridSearchService:
         effective_filters: SearchFilters = request.resolved_filters()
 
         started = time.perf_counter()
-        try:
-            embed_results = await provider.embed_texts(
-                [request.query],
-                model=runtime.model,
-                dimensions=runtime.dimensions,
-                truncate=self._settings.embedding_truncate,
-            )
-        except EmbeddingProviderUnavailableError as exc:
-            raise EmbeddingProviderNotAvailableError(
-                f"Embedding provider '{runtime.provider}' is unavailable: {exc}"
-            ) from exc
-        except EmbeddingProviderError as exc:
-            from app.adapters.embeddings import EmbeddingDimensionMismatchError
-
-            if isinstance(exc, EmbeddingDimensionMismatchError):
-                raise SearchConfigurationError(
-                    f"Embedding dimensions mismatch for provider '{runtime.provider}'"
-                    f" / model '{runtime.model}': {exc}"
-                ) from exc
-            raise SearchServiceError(
-                f"Embedding provider returned an error: {exc}"
-            ) from exc
-        finally:
-            if self._owns_providers:
-                for owned_provider in self._providers.values():
-                    close = getattr(owned_provider, "aclose", None)
-                    if callable(close):
-                        try:
-                            await close()
-                        except Exception:
-                            logger.debug(
-                                "Failed to close embedding provider cleanly",
-                                exc_info=True,
-                            )
-
-        if len(embed_results) != 1:
-            raise SearchServiceError(
-                f"Embedding provider returned {len(embed_results)} embeddings for 1 query"
-            )
-        result = embed_results[0]
-        if result.text_index != 0:
-            raise SearchServiceError(
-                f"Embedding provider returned embedding for unexpected index {result.text_index}"
-            )
-
-        query_vector = validate_embedding_vector(
-            result.vector,
-            expected_dimensions=runtime.dimensions,
-            field_name="query_embedding",
-        )
-        actual_model: str = result.model or runtime.model
+        actual_model = self._settings.embedding_model
 
         # --- Vector candidates ---
-        vector_search_result = await self._repository.semantic_search(
-            query_vector,
-            limit=request.effective_vector_top_k(),
-            min_score=None,  # minScore applied after fusion
-            search_filters=effective_filters,
-            embedding_model=actual_model,
-        )
-        vector_rows = vector_search_result.rows
+        vector_rows: list[ChunkSearchRow] = []
+        if v_weight > 0.0:
+            runtime = await self._resolve_runtime()
+            provider = self._providers.get(runtime.provider)
+            if provider is None:
+                raise SearchConfigurationError(
+                    f"Unknown embedding provider '{runtime.provider}'"
+                )
+
+            try:
+                embed_results = await provider.embed_texts(
+                    [request.query],
+                    model=runtime.model,
+                    dimensions=runtime.dimensions,
+                    truncate=self._settings.embedding_truncate,
+                )
+            except EmbeddingProviderUnavailableError as exc:
+                raise EmbeddingProviderNotAvailableError(
+                    f"Embedding provider '{runtime.provider}' is unavailable: {exc}"
+                ) from exc
+            except EmbeddingProviderError as exc:
+                from app.adapters.embeddings import EmbeddingDimensionMismatchError
+
+                if isinstance(exc, EmbeddingDimensionMismatchError):
+                    raise SearchConfigurationError(
+                        f"Embedding dimensions mismatch for provider '{runtime.provider}'"
+                        f" / model '{runtime.model}': {exc}"
+                    ) from exc
+                raise SearchServiceError(
+                    f"Embedding provider returned an error: {exc}"
+                ) from exc
+            finally:
+                if self._owns_providers:
+                    for owned_provider in self._providers.values():
+                        close = getattr(owned_provider, "aclose", None)
+                        if callable(close):
+                            try:
+                                await close()
+                            except Exception:
+                                logger.debug(
+                                    "Failed to close embedding provider cleanly",
+                                    exc_info=True,
+                                )
+
+            if len(embed_results) != 1:
+                raise SearchServiceError(
+                    f"Embedding provider returned {len(embed_results)} embeddings for 1 query"
+                )
+            result = embed_results[0]
+            if result.text_index != 0:
+                raise SearchServiceError(
+                    "Embedding provider returned embedding for unexpected index "
+                    f"{result.text_index}"
+                )
+
+            query_vector = validate_embedding_vector(
+                result.vector,
+                expected_dimensions=runtime.dimensions,
+                field_name="query_embedding",
+            )
+            actual_model = result.model or runtime.model
+
+            vector_search_result = await self._repository.semantic_search(
+                query_vector,
+                limit=request.effective_vector_top_k(),
+                min_score=None,  # minScore applied after fusion
+                search_filters=effective_filters,
+                embedding_model=actual_model,
+            )
+            vector_rows = vector_search_result.rows
 
         # --- Full-text candidates ---
-        ft_rows = await self._repository.full_text_candidates(
-            request.query,
-            limit=request.effective_full_text_top_k(),
-            search_filters=effective_filters,
-        )
+        ft_rows: list[FullTextSearchRow] = []
+        if ft_weight > 0.0:
+            ft_rows = await self._repository.full_text_candidates(
+                request.query,
+                limit=request.effective_full_text_top_k(),
+                search_filters=effective_filters,
+            )
 
         # Candidate diagnostics for the fused result set (unique chunks/documents
         # returned by either retrieval path).
