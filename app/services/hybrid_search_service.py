@@ -162,10 +162,18 @@ def _fuse_results(
         entries[row.chunk_id] = entry
 
     # --- Incorporate full-text candidates ---
+    ft_score_denom = (
+        max((r.ft_score for r in ft_rows), default=0.0) if strategy == "weighted" else 1.0
+    )
     for rank_0, ft_row in enumerate(ft_rows, start=1):
+        ft_score = (
+            (ft_row.ft_score / ft_score_denom)
+            if strategy == "weighted" and ft_score_denom > 0.0
+            else ft_row.ft_score
+        )
         if ft_row.chunk_id in entries:
             existing = entries[ft_row.chunk_id]
-            existing.full_text_score = ft_row.ft_score
+            existing.full_text_score = ft_score
             existing.full_text_rank = rank_0
             if "full_text" not in existing.matched_by:
                 existing.matched_by.append("full_text")
@@ -183,7 +191,7 @@ def _fuse_results(
                 end_offset=ft_row.end_offset,
                 content=ft_row.content,
                 metadata=ft_row.metadata or {},
-                full_text_score=ft_row.ft_score,
+                full_text_score=ft_score,
                 full_text_rank=rank_0,
                 matched_by=["full_text"],
             )
