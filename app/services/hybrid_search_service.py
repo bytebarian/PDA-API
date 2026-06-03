@@ -111,9 +111,9 @@ def _weighted_score(
 ) -> float:
     """Compute a normalised weighted combination of component scores.
 
-    Missing scores are treated as zero.  The result is normalised by the sum
-    of weights present so a chunk matched by only one source is not
-    artificially penalised relative to the max achievable score.
+    Missing scores are ignored (their weights are excluded from normalisation).
+    The result is normalised by the sum of weights present so a chunk matched
+    by only one source is not artificially penalised relative to the max achievable score.
     """
     total_weight = 0.0
     weighted_sum = 0.0
