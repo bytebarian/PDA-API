@@ -7,6 +7,9 @@ from typing import Any, Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
+DEFAULT_CONTEXT_MAX_CHUNKS = 12
+DEFAULT_CONTEXT_MAX_CHARACTERS = 12000
+
 
 class RetrievalResultForContext(BaseModel):
     """Normalized retrieval chunk input accepted by the context builder."""
@@ -160,9 +163,9 @@ class ContextBuildRequest(BaseModel):
     retrieval_results: list[RetrievalResultForContext] = Field(
         validation_alias=AliasChoices("retrieval_results", "retrievalResults")
     )
-    max_chunks: int = Field(default=12, ge=1, le=50)
+    max_chunks: int = Field(default=DEFAULT_CONTEXT_MAX_CHUNKS, ge=1, le=50)
     max_characters: int = Field(
-        default=12000,
+        default=DEFAULT_CONTEXT_MAX_CHARACTERS,
         ge=1000,
         le=100000,
         validation_alias=AliasChoices("max_characters", "maxCharacters"),

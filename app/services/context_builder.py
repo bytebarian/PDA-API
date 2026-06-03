@@ -13,6 +13,8 @@ from typing import Any, Literal
 from pydantic import ValidationError
 
 from app.schemas.context import (
+    DEFAULT_CONTEXT_MAX_CHARACTERS,
+    DEFAULT_CONTEXT_MAX_CHUNKS,
     BuiltContext,
     ContextSource,
     ExcludedContextChunk,
@@ -23,8 +25,6 @@ from app.schemas.context import (
 from app.schemas.hybrid_search import HybridSearchResult
 from app.schemas.search import SemanticSearchResult
 
-DEFAULT_MAX_CHUNKS = 12
-DEFAULT_MAX_CHARACTERS = 12000
 _MISSING_SORT_SENTINEL = sys.maxsize
 _ExcludedReason = Literal[
     "budget_exceeded",
@@ -164,7 +164,7 @@ class ContextBuilderService:
         query: str | None = None,
         max_tokens: int | None = None,
         max_characters: int | None = None,
-        max_chunks: int = DEFAULT_MAX_CHUNKS,
+        max_chunks: int = DEFAULT_CONTEXT_MAX_CHUNKS,
         include_metadata: bool = True,
         include_scores: bool = False,
         group_by_document: bool = True,
@@ -172,7 +172,7 @@ class ContextBuilderService:
     ) -> BuiltContext:
         if max_chunks < 1:
             raise ValueError("max_chunks must be >= 1")
-        max_characters = max_characters or DEFAULT_MAX_CHARACTERS
+        max_characters = max_characters or DEFAULT_CONTEXT_MAX_CHARACTERS
         if max_characters < 1:
             raise ValueError("max_characters must be >= 1")
 
@@ -381,8 +381,8 @@ class ContextBuilderService:
                 merged[attr] = getattr(incoming, attr)
 
         if incoming.metadata:
-            # Keep existing metadata keys authoritative while still filling missing
-            # keys from duplicates discovered in alternate retrieval paths.
+            # Merge duplicate metadata while keeping the existing result
+            # authoritative (right-most dictionary wins on key collisions).
             merged["metadata"] = {**incoming.metadata, **current.metadata}
         return RetrievalResultForContext.model_validate(merged)
 
@@ -452,6 +452,8 @@ class ContextBuilderService:
         best: tuple[str | None, int] = (None, 0)
 
         while low <= high:
+            # Binary search for the largest truncation length that still keeps
+            # the fully rendered context within character/token budgets.
             mid = (low + high) // 2
             maybe_text = _truncate_on_boundary(text, mid)
             if not maybe_text:
