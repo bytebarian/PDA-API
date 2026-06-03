@@ -172,7 +172,8 @@ class ContextBuilderService:
     ) -> BuiltContext:
         if max_chunks < 1:
             raise ValueError("max_chunks must be >= 1")
-        max_characters = max_characters or DEFAULT_CONTEXT_MAX_CHARACTERS
+        if max_characters is None:
+            max_characters = DEFAULT_CONTEXT_MAX_CHARACTERS
         if max_characters < 1:
             raise ValueError("max_characters must be >= 1")
 
