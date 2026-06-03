@@ -284,7 +284,7 @@ async def test_model_payload_can_be_passed_to_mock_model_client(
 
     captured: list[dict[str, str]] = []
 
-    async def mock_model_call(model_input: list[dict[str, str]]) -> dict[str, str]:
+    async def capture_model_input(model_input: list[dict[str, str]]) -> dict[str, str]:
         captured.extend(model_input)
         return {"status": "ok"}
 
@@ -299,7 +299,7 @@ async def test_model_payload_can_be_passed_to_mock_model_client(
         },
     ]
 
-    response = await mock_model_call(model_input)
+    response = await capture_model_input(model_input)
 
     assert response == {"status": "ok"}
     assert captured == model_input

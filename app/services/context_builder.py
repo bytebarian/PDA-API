@@ -24,6 +24,7 @@ from app.schemas.search import SemanticSearchResult
 
 DEFAULT_MAX_CHUNKS = 12
 DEFAULT_MAX_CHARACTERS = 12000
+_MISSING_SORT_SENTINEL = 10**9
 _ExcludedReason = Literal[
     "budget_exceeded",
     "max_chunks_exceeded",
@@ -82,8 +83,12 @@ def _sort_results(
                 -(item.score or 0.0),
                 str(item.document_id),
                 item.chunk_index,
-                item.page_number if item.page_number is not None else 10**9,
-                item.start_offset if item.start_offset is not None else 10**9,
+                item.page_number
+                if item.page_number is not None
+                else _MISSING_SORT_SENTINEL,
+                item.start_offset
+                if item.start_offset is not None
+                else _MISSING_SORT_SENTINEL,
                 str(item.chunk_id),
             ),
         )
@@ -107,8 +112,12 @@ def _sort_results(
                 grouped[doc_id],
                 key=lambda item: (
                     item.chunk_index,
-                    item.page_number if item.page_number is not None else 10**9,
-                    item.start_offset if item.start_offset is not None else 10**9,
+                    item.page_number
+                    if item.page_number is not None
+                    else _MISSING_SORT_SENTINEL,
+                    item.start_offset
+                    if item.start_offset is not None
+                    else _MISSING_SORT_SENTINEL,
                     str(item.chunk_id),
                 ),
             )
@@ -170,7 +179,7 @@ class ContextBuilderService:
         ordered = _sort_results(normalized, group_by_document=group_by_document)
         template = _style_template(context_style)
 
-        prefix, suffix = self._context_wrappers(template, context_style)
+        prefix, suffix = self._context_wrappers(template, context_style, query=query)
 
         included_blocks: list[str] = []
         sources: list[ContextSource] = []
@@ -349,6 +358,7 @@ class ContextBuilderService:
     def _merge_preferred(
         self, current: RetrievalResultForContext, incoming: RetrievalResultForContext
     ) -> None:
+        """Merge duplicate candidate details into *current* in place."""
         if (incoming.score or 0.0) > (current.score or 0.0):
             current.score = incoming.score
 
@@ -375,17 +385,22 @@ class ContextBuilderService:
         self,
         template: _ContextStyleTemplate,
         style: Literal["chat", "report", "raw"],
+        *,
+        query: str | None,
     ) -> tuple[str, str]:
         if not template.include_wrappers:
             return "", ""
 
+        query_line = f"Query: {query}\n\n" if query else ""
         opening = (
             f"{template.system_instruction}\n\n"
+            f"{query_line}"
             "<document_context>\n"
         )
         if style == "report":
             opening = (
                 f"{template.system_instruction}\n\n"
+                f"{query_line}"
                 "<report_document_context>\n"
             )
             return opening, "\n</report_document_context>"
