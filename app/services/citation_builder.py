@@ -149,7 +149,7 @@ class CitationBuilder:
                 metadata = getattr(retrieval_result, "metadata", {}) or {}
                 if hasattr(retrieval_result, "matched_by"):
                     matched_by = getattr(retrieval_result, "matched_by", None)
-                    relevance_source = _relevance_source_from_matched_by(matched_by) or "manual"
+                    relevance_source = _relevance_source_from_matched_by(matched_by) or "context"
                 else:
                     relevance_source = "vector"
 
