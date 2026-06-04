@@ -6,6 +6,7 @@ import uuid
 from collections.abc import AsyncGenerator, Generator
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -336,6 +337,55 @@ def test_chat_service_defers_search_provider_construction(
     )
 
     assert calls == []
+
+
+@pytest.mark.parametrize("strategy", ["hybrid", "semantic"])
+@pytest.mark.asyncio
+async def test_chat_service_lazily_constructs_requested_search_service(
+    db_session: AsyncSession,
+    api_settings: Settings,
+    strategy: Literal["hybrid", "semantic"],
+) -> None:
+    provider = FakeEmbeddingProvider()
+    doc = await _seed_doc(db_session, filename="employment-contract.pdf")
+    await _seed_chunk(
+        db_session,
+        provider,
+        api_settings,
+        doc.id,
+        chunk_index=7,
+        content=(
+            "According to the employment contract, the termination notice period is "
+            "three months."
+        ),
+    )
+    await db_session.commit()
+    service = ChatService(
+        db_session,
+        embedding_providers={"fake": provider},
+        model_provider=MockChatModelProvider(
+            answer="The termination notice period is three months. [S1]"
+        ),
+        settings=api_settings,
+    )
+
+    response = await service.ask_question(
+        ChatAskRequest(
+            question="What is the termination notice period?",
+            retrieval_strategy=strategy,
+        )
+    )
+
+    assert response.retrieval is not None
+    assert response.retrieval.strategy == strategy
+    assert len(response.citations) == 1
+    assert response.citations[0].document_id == doc.id
+    if strategy == "semantic":
+        assert service._search_service_instance is not None
+        assert service._hybrid_search_service_instance is None
+    else:
+        assert service._hybrid_search_service_instance is not None
+        assert service._search_service_instance is None
 
 
 @pytest.mark.asyncio
