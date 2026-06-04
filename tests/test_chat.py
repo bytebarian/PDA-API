@@ -315,6 +315,29 @@ async def test_chat_service_skips_model_call_when_no_context(
     assert provider.calls == []
 
 
+def test_chat_service_defers_search_provider_construction(
+    db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+
+    def fail_if_called(_settings: Settings) -> dict[str, FakeEmbeddingProvider]:
+        calls.append("called")
+        raise AssertionError("embedding providers should be constructed lazily")
+
+    monkeypatch.setattr("app.services.search_service._build_providers", fail_if_called)
+    monkeypatch.setattr(
+        "app.services.hybrid_search_service._build_providers", fail_if_called
+    )
+
+    ChatService(
+        db_session,
+        model_provider=MockChatModelProvider(),
+        settings=Settings(model_provider="mock", _env_file=None),  # type: ignore[call-arg]
+    )
+
+    assert calls == []
+
+
 @pytest.mark.asyncio
 async def test_chat_service_adds_fallback_citations_when_model_omits_markers(
     db_session: AsyncSession,

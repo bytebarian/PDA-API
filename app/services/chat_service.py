@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.embeddings import EmbeddingProvider
 from app.adapters.llm import (
     ChatMessage,
     ChatModelError,
@@ -101,6 +102,7 @@ class ChatService:
         *,
         hybrid_search_service: HybridSearchService | None = None,
         search_service: SearchService | None = None,
+        embedding_providers: dict[str, EmbeddingProvider] | None = None,
         context_builder: ContextBuilderService | None = None,
         model_provider: ChatModelProvider | None = None,
         citation_mapper: CitationMapper | None = None,
@@ -108,20 +110,35 @@ class ChatService:
     ) -> None:
         self._db = db
         self._settings = settings or get_settings()
-        self._hybrid_search_service = hybrid_search_service or HybridSearchService(
-            db,
-            settings=self._settings,
-        )
-        self._search_service = search_service or SearchService(
-            db,
-            settings=self._settings,
-        )
+        self._hybrid_search_service_instance = hybrid_search_service
+        self._search_service_instance = search_service
+        self._embedding_providers = embedding_providers
         self._context_builder = context_builder or ContextBuilderService()
         self._model_provider = model_provider or get_chat_model_provider(
             settings=self._settings
         )
         self._citation_mapper = citation_mapper or CitationMapper()
         self._owns_model_provider = model_provider is None
+
+    @property
+    def _hybrid_search_service(self) -> HybridSearchService:
+        if self._hybrid_search_service_instance is None:
+            self._hybrid_search_service_instance = HybridSearchService(
+                self._db,
+                providers=self._embedding_providers,
+                settings=self._settings,
+            )
+        return self._hybrid_search_service_instance
+
+    @property
+    def _search_service(self) -> SearchService:
+        if self._search_service_instance is None:
+            self._search_service_instance = SearchService(
+                self._db,
+                providers=self._embedding_providers,
+                settings=self._settings,
+            )
+        return self._search_service_instance
 
     async def ask_question(self, request: ChatAskRequest) -> ChatAskResponse:
         """Answer one question using retrieved document context."""

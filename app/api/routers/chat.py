@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.schemas.chat import ChatAskRequest, ChatAskResponse
+from app.api.routers.search import _get_shared_providers
 from app.services.chat_service import (
     ChatConfigurationError,
     ChatProviderNotAvailableError,
@@ -25,7 +26,11 @@ def get_chat_service(
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> ChatService:
-    return ChatService(db, settings=settings)
+    return ChatService(
+        db,
+        embedding_providers=_get_shared_providers(settings),
+        settings=settings,
+    )
 
 
 @router.post(
