@@ -43,12 +43,7 @@ class CitationMapper:
                 continue
 
             result = result_lookup.get(source.chunk_id)
-            excerpt = ""
-            if result is not None:
-                excerpt = self._build_excerpt(result, source)
-            if not excerpt:
-                excerpt = _make_excerpt(source.document_name)
-
+            excerpt = self._build_excerpt(result, source) if result is not None else ""
             citations.append(
                 ChatCitation(
                     source_id=source.source_id,
