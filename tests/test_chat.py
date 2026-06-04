@@ -210,7 +210,10 @@ def test_citation_mapper_ignores_unknown_source_ids() -> None:
 
 def test_chat_service_ignores_legacy_citation_mapper_instance(
     db_session: AsyncSession,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
+    caplog.set_level("WARNING", logger="app.services.chat_service")
+
     service = ChatService(
         db_session,
         model_provider=MockChatModelProvider(),
@@ -219,6 +222,7 @@ def test_chat_service_ignores_legacy_citation_mapper_instance(
     )
 
     assert isinstance(service._citation_builder, CitationBuilder)
+    assert "ignoring legacy citation_mapper" in caplog.text
 
 
 @pytest.mark.asyncio
