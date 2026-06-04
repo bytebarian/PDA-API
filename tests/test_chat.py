@@ -275,7 +275,8 @@ async def test_chat_service_ignores_legacy_citation_mapper_instance(
     assert response.citations[0].document_id == document_id
     assert "ignoring legacy citation_mapper" in caplog.text
     assert any(
-        getattr(record, "citation_mapper_type", None) == "CitationMapper"
+        hasattr(record, "citation_mapper_type")
+        and record.citation_mapper_type == "CitationMapper"
         for record in caplog.records
     )
 
