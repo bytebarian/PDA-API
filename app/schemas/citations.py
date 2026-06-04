@@ -54,7 +54,7 @@ class Citation(BaseModel):
     )
     excerpt: str
     score: float | None = None
-    relevance_source: Literal["vector", "full_text", "hybrid", "manual", "context"] | None = Field(
+    relevance_source: Literal["vector", "full_text", "hybrid", "context"] | None = Field(
         default=None,
         validation_alias=AliasChoices("relevance_source", "relevanceSource"),
     )
