@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from fastapi import APIRouter
 
 from app.schemas.citations import CitationBuildRequest, CitationBuildResponse, CitationSourceInput
@@ -12,8 +14,8 @@ router = APIRouter(prefix="/citations", tags=["citations"])
 _builder = CitationBuilder()
 
 
-def _make_context_source_from_input(inp: CitationSourceInput):  # type: ignore[return]
-    """Convert a CitationSourceInput to a lightweight duck-typed object for the builder."""
+def _make_context_source_from_input(inp: CitationSourceInput) -> object:
+    """Convert a CitationSourceInput to a ContextSource for the builder."""
     from app.schemas.context import ContextSource, IncludedTextRange
 
     return ContextSource(
@@ -34,9 +36,8 @@ def _make_context_source_from_input(inp: CitationSourceInput):  # type: ignore[r
     )
 
 
-def _make_retrieval_result_from_input(inp: CitationSourceInput):
+def _make_retrieval_result_from_input(inp: CitationSourceInput) -> SimpleNamespace:
     """Return a duck-typed retrieval result used for text lookup."""
-    from types import SimpleNamespace
     return SimpleNamespace(
         chunk_id=inp.chunk_id,
         document_id=inp.document_id,
@@ -70,10 +71,10 @@ def build_citations(request: CitationBuildRequest) -> CitationBuildResponse:
     retrieval_results = [_make_retrieval_result_from_input(s) for s in request.sources]
 
     citations, diagnostics = _builder.build_from_sources(
-        context_sources,
+        context_sources,  # type: ignore[arg-type]
         answer_text=request.answer_text,
         include_uncited_sources=request.include_uncited_sources,
         max_excerpt_characters=request.max_excerpt_characters,
-        retrieval_results=retrieval_results,
+        retrieval_results=retrieval_results,  # type: ignore[arg-type]
     )
     return CitationBuildResponse(citations=citations, diagnostics=diagnostics)
