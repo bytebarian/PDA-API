@@ -208,20 +208,73 @@ def test_citation_mapper_ignores_unknown_source_ids() -> None:
     assert citations[0].document_name == "employment-contract.pdf"
 
 
-def test_chat_service_ignores_legacy_citation_mapper_instance(
+@pytest.mark.asyncio
+async def test_chat_service_ignores_legacy_citation_mapper_instance(
     db_session: AsyncSession,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level("WARNING", logger="app.services.chat_service")
+    chunk_id = uuid.uuid4()
+    document_id = uuid.uuid4()
+    hybrid_service = MagicMock()
+    hybrid_service.hybrid_search = AsyncMock(
+        return_value=HybridSearchResponse(
+            query="What is the notice period?",
+            top_k=8,
+            fusion_strategy="rrf",
+            embedding_model="test-chat-embedding",
+            filters_applied={},
+            candidate_document_count=1,
+            candidate_chunk_count=1,
+            vector_candidate_count=1,
+            full_text_candidate_count=0,
+            result_count=1,
+            results=[
+                HybridSearchResult(
+                    chunk_id=chunk_id,
+                    document_id=document_id,
+                    document_name="employment-contract.pdf",
+                    document_path="/documents/employment-contract.pdf",
+                    category="contracts",
+                    file_type="pdf",
+                    page_number=3,
+                    chunk_index=7,
+                    start_offset=1200,
+                    end_offset=1840,
+                    text="The notice period is three months.",
+                    excerpt="The notice period is three months.",
+                    score=0.91,
+                    vector_score=0.91,
+                    full_text_score=None,
+                    vector_rank=1,
+                    full_text_rank=None,
+                    matched_by=["vector"],
+                    metadata={},
+                )
+            ],
+        )
+    )
 
     service = ChatService(
         db_session,
-        model_provider=MockChatModelProvider(),
+        hybrid_search_service=hybrid_service,
+        search_service=MagicMock(),
+        context_builder=ContextBuilderService(),
+        model_provider=MockChatModelProvider(
+            answer="The notice period is three months. [S1]"
+        ),
         citation_mapper=CitationMapper(),
-        settings=Settings(model_provider="mock", _env_file=None),  # type: ignore[call-arg]
+        settings=Settings(model_provider="mock", model_name="llama3.1", _env_file=None),  # type: ignore[call-arg]
+    )
+
+    response = await service.ask_question(
+        ChatAskRequest(question="What is the notice period?")
     )
 
     assert isinstance(service._citation_builder, CitationBuilder)
+    assert len(response.citations) == 1
+    assert response.citations[0].source_id == "S1"
+    assert response.citations[0].document_id == document_id
     assert "ignoring legacy citation_mapper" in caplog.text
     assert any(
         getattr(record, "citation_mapper_type", None) == "CitationMapper"
