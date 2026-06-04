@@ -262,6 +262,8 @@ async def test_chat_unknown_marker_not_fabricated(
 
     # S99 has no matching context source; it must be silently ignored.
     # The fallback (no valid markers → top-3 sources) will produce one citation.
+    assert len(response.citations) == 1
+    assert response.citations[0].source_id == "S1"
     for cit in response.citations:
         assert cit.source_id != "S99", "S99 must never appear as a citation source_id"
 

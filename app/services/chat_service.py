@@ -47,8 +47,8 @@ logger = logging.getLogger(__name__)
 _INSUFFICIENT_CONTEXT_ANSWER = (
     "I could not find enough relevant information in the indexed documents to answer this question."
 )
-_MISSING_MARKERS_WARNING = (
-    "Model answer did not include citation markers; returning top included sources."
+_MISSING_CITATIONS_WARNING = (
+    "Model answer did not include matching citation markers; returning top included sources."
 )
 
 
@@ -194,12 +194,12 @@ class ChatService:
             retrieval_results=search_outcome.results,
         )
         warning: str | None = None
-        if not extracted_source_ids and built_context.sources:
+        if not citations and built_context.sources:
             citations, _diag = self._citation_builder.build_from_sources(
                 built_context.sources[:min(3, len(built_context.sources))],
                 retrieval_results=search_outcome.results,
             )
-            warning = _MISSING_MARKERS_WARNING
+            warning = _MISSING_CITATIONS_WARNING
 
         logger.info(
             "chat answer generated",
