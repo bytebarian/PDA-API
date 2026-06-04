@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
+from app.schemas.citations import Citation
 from app.schemas.search_filters import SearchFilters
 
 _DEFAULT_CHAT_TOP_K = 8
@@ -79,7 +80,7 @@ class ChatAskRequest(BaseModel):
 
 
 class ChatCitation(BaseModel):
-    """One frontend-ready citation entry."""
+    """One frontend-ready citation entry (legacy alias; use Citation from citations.py)."""
 
     source_id: str = Field(validation_alias=AliasChoices("source_id", "sourceId"))
     document_id: uuid.UUID = Field(
@@ -178,7 +179,7 @@ class ChatAskResponse(BaseModel):
     """Response body for POST /chat/ask."""
 
     answer: str
-    citations: list[ChatCitation]
+    citations: list[Citation]
     retrieval: RetrievalDiagnostics | None = None
     model: ModelDiagnostics | None = None
     usage: UsageDiagnostics | None = None

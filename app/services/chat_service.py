@@ -32,7 +32,7 @@ from app.schemas.search import (
     SemanticSearchRequest,
     SemanticSearchResult,
 )
-from app.services.citation_mapper import CitationMapper
+from app.services.citation_builder import CitationBuilder
 from app.services.context_builder import ContextBuilderService
 from app.services.hybrid_search_service import HybridSearchService
 from app.services.search_service import (
@@ -105,7 +105,8 @@ class ChatService:
         embedding_providers: dict[str, EmbeddingProvider] | None = None,
         context_builder: ContextBuilderService | None = None,
         model_provider: ChatModelProvider | None = None,
-        citation_mapper: CitationMapper | None = None,
+        citation_builder: CitationBuilder | None = None,
+        citation_mapper: CitationBuilder | None = None,  # legacy alias
         settings: Settings | None = None,
     ) -> None:
         self._db = db
@@ -117,7 +118,9 @@ class ChatService:
         self._model_provider = model_provider or get_chat_model_provider(
             settings=self._settings
         )
-        self._citation_mapper = citation_mapper or CitationMapper()
+        # Accept both `citation_builder` and legacy `citation_mapper` keyword;
+        # the latter used CitationMapper which has been superseded.
+        self._citation_builder = citation_builder or citation_mapper or CitationBuilder()
         self._owns_model_provider = model_provider is None
 
     @property
@@ -184,21 +187,17 @@ class ChatService:
                 if callable(close):
                     await close()
 
-        extracted_source_ids = self._citation_mapper.extract_source_ids(model_result.text)
-        citations = self._citation_mapper.map_to_citations(
-            extracted_source_ids,
+        extracted_source_ids = self._citation_builder.extract_source_markers(model_result.text)
+        citations, _diag = self._citation_builder.build_from_sources(
             built_context.sources,
-            search_outcome.results,
+            answer_text=model_result.text,
+            retrieval_results=search_outcome.results,
         )
         warning: str | None = None
         if not extracted_source_ids and built_context.sources:
-            fallback_source_ids = [
-                source.source_id for source in built_context.sources[: min(3, len(built_context.sources))]
-            ]
-            citations = self._citation_mapper.map_to_citations(
-                fallback_source_ids,
-                built_context.sources,
-                search_outcome.results,
+            citations, _diag = self._citation_builder.build_from_sources(
+                built_context.sources[:min(3, len(built_context.sources))],
+                retrieval_results=search_outcome.results,
             )
             warning = _MISSING_MARKERS_WARNING
 
