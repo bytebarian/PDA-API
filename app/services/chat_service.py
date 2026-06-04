@@ -32,7 +32,7 @@ from app.schemas.search import (
     SemanticSearchRequest,
     SemanticSearchResult,
 )
-from app.services.citation_mapper import CitationMapper
+from app.services.citation_builder import CitationBuilder
 from app.services.context_builder import ContextBuilderService
 from app.services.hybrid_search_service import HybridSearchService
 from app.services.search_service import (
@@ -47,8 +47,8 @@ logger = logging.getLogger(__name__)
 _INSUFFICIENT_CONTEXT_ANSWER = (
     "I could not find enough relevant information in the indexed documents to answer this question."
 )
-_MISSING_MARKERS_WARNING = (
-    "Model answer did not include citation markers; returning top included sources."
+_MISSING_CITATIONS_WARNING = (
+    "Model answer did not include matching citation markers; returning top included sources."
 )
 
 
@@ -105,7 +105,8 @@ class ChatService:
         embedding_providers: dict[str, EmbeddingProvider] | None = None,
         context_builder: ContextBuilderService | None = None,
         model_provider: ChatModelProvider | None = None,
-        citation_mapper: CitationMapper | None = None,
+        citation_builder: CitationBuilder | None = None,
+        citation_mapper: object | None = None,  # legacy alias; prefer citation_builder
         settings: Settings | None = None,
     ) -> None:
         self._db = db
@@ -117,7 +118,17 @@ class ChatService:
         self._model_provider = model_provider or get_chat_model_provider(
             settings=self._settings
         )
-        self._citation_mapper = citation_mapper or CitationMapper()
+        if citation_builder is not None:
+            self._citation_builder = citation_builder
+        elif isinstance(citation_mapper, CitationBuilder):
+            self._citation_builder = citation_mapper
+        else:
+            if citation_mapper is not None:
+                logger.warning(
+                    "ignoring legacy citation_mapper that is not a CitationBuilder",
+                    extra={"citation_mapper_type": type(citation_mapper).__name__},
+                )
+            self._citation_builder = CitationBuilder()
         self._owns_model_provider = model_provider is None
 
     @property
@@ -184,23 +195,19 @@ class ChatService:
                 if callable(close):
                     await close()
 
-        extracted_source_ids = self._citation_mapper.extract_source_ids(model_result.text)
-        citations = self._citation_mapper.map_to_citations(
-            extracted_source_ids,
+        extracted_source_ids = self._citation_builder.extract_source_markers(model_result.text)
+        citations, _diag = self._citation_builder.build_from_sources(
             built_context.sources,
-            search_outcome.results,
+            answer_text=model_result.text,
+            retrieval_results=search_outcome.results,
         )
         warning: str | None = None
-        if not extracted_source_ids and built_context.sources:
-            fallback_source_ids = [
-                source.source_id for source in built_context.sources[: min(3, len(built_context.sources))]
-            ]
-            citations = self._citation_mapper.map_to_citations(
-                fallback_source_ids,
-                built_context.sources,
-                search_outcome.results,
+        if not citations and built_context.sources:
+            citations, _diag = self._citation_builder.build_from_sources(
+                built_context.sources[:min(3, len(built_context.sources))],
+                retrieval_results=search_outcome.results,
             )
-            warning = _MISSING_MARKERS_WARNING
+            warning = _MISSING_CITATIONS_WARNING
 
         logger.info(
             "chat answer generated",
