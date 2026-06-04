@@ -223,6 +223,10 @@ def test_chat_service_ignores_legacy_citation_mapper_instance(
 
     assert isinstance(service._citation_builder, CitationBuilder)
     assert "ignoring legacy citation_mapper" in caplog.text
+    assert any(
+        getattr(record, "citation_mapper_type", None) == "CitationMapper"
+        for record in caplog.records
+    )
 
 
 @pytest.mark.asyncio

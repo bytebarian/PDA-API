@@ -106,7 +106,7 @@ class ChatService:
         context_builder: ContextBuilderService | None = None,
         model_provider: ChatModelProvider | None = None,
         citation_builder: CitationBuilder | None = None,
-        citation_mapper: object | None = None,  # legacy alias
+        citation_mapper: object | None = None,  # legacy alias; use citation_builder
         settings: Settings | None = None,
     ) -> None:
         self._db = db
