@@ -143,6 +143,16 @@ class CitationBuilder:
             if truncated:
                 diag.excerpts_truncated += 1
 
+            metadata = {}
+            relevance_source: _RelevanceSource | None = "context"
+            if retrieval_result is not None:
+                metadata = getattr(retrieval_result, "metadata", {}) or {}
+                if hasattr(retrieval_result, "matched_by"):
+                    matched_by = getattr(retrieval_result, "matched_by", None)
+                    relevance_source = _relevance_source_from_matched_by(matched_by) or "manual"
+                else:
+                    relevance_source = "vector"
+
             citations.append(
                 Citation(
                     source_id=source.source_id,
@@ -157,7 +167,8 @@ class CitationBuilder:
                     end_offset=source.end_offset,
                     excerpt=excerpt,
                     score=source.score,
-                    relevance_source="context",
+                    relevance_source=relevance_source,
+                    metadata=metadata,
                 )
             )
 
