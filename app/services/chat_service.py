@@ -131,7 +131,7 @@ class ChatService:
             list(search_outcome.results),
             query=request.question,
             max_tokens=request.max_context_tokens,
-            context_style="chat",
+            context_style="raw",
         )
 
         if not search_outcome.results or built_context.included_chunk_count == 0:
