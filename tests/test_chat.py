@@ -28,6 +28,7 @@ from app.models.document_chunk import DocumentChunk
 from app.schemas.chat import ChatAskRequest
 from app.schemas.context import ContextSource, IncludedTextRange
 from app.schemas.hybrid_search import HybridSearchResponse, HybridSearchResult
+from app.services.citation_builder import CitationBuilder
 from app.services.chat_service import ChatProviderNotAvailableError, ChatService
 from app.services.citation_mapper import CitationMapper
 from app.services.context_builder import ContextBuilderService
@@ -205,6 +206,19 @@ def test_citation_mapper_ignores_unknown_source_ids() -> None:
     assert len(citations) == 1
     assert citations[0].source_id == "S1"
     assert citations[0].document_name == "employment-contract.pdf"
+
+
+def test_chat_service_ignores_legacy_citation_mapper_instance(
+    db_session: AsyncSession,
+) -> None:
+    service = ChatService(
+        db_session,
+        model_provider=MockChatModelProvider(),
+        citation_mapper=CitationMapper(),
+        settings=Settings(model_provider="mock", _env_file=None),  # type: ignore[call-arg]
+    )
+
+    assert isinstance(service._citation_builder, CitationBuilder)
 
 
 @pytest.mark.asyncio

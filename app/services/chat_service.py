@@ -106,7 +106,7 @@ class ChatService:
         context_builder: ContextBuilderService | None = None,
         model_provider: ChatModelProvider | None = None,
         citation_builder: CitationBuilder | None = None,
-        citation_mapper: CitationBuilder | None = None,  # legacy alias
+        citation_mapper: object | None = None,  # legacy alias
         settings: Settings | None = None,
     ) -> None:
         self._db = db
@@ -118,9 +118,17 @@ class ChatService:
         self._model_provider = model_provider or get_chat_model_provider(
             settings=self._settings
         )
-        # Accept both `citation_builder` and legacy `citation_mapper` keyword;
-        # the latter used CitationMapper which has been superseded.
-        self._citation_builder = citation_builder or citation_mapper or CitationBuilder()
+        if citation_builder is not None:
+            self._citation_builder = citation_builder
+        elif isinstance(citation_mapper, CitationBuilder):
+            self._citation_builder = citation_mapper
+        else:
+            if citation_mapper is not None:
+                logger.warning(
+                    "ignoring legacy citation_mapper that is not a CitationBuilder",
+                    extra={"citation_mapper_type": type(citation_mapper).__name__},
+                )
+            self._citation_builder = CitationBuilder()
         self._owns_model_provider = model_provider is None
 
     @property
