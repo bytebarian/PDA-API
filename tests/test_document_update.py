@@ -116,18 +116,18 @@ async def test_patch_document_updates_only_provided_fields(
 
     response = client.patch(
         f"/documents/{document.id}",
-        json={"category": "finance"},
+        json={"category": "documentation"},
     )
 
     assert response.status_code == 200
     body = response.json()
-    assert body["category"] == "finance"
+    assert body["category"] == "documentation"
     assert body["file_type"] == "pdf"
     assert body["summary"] == "initial-summary"
 
     updated = await db_session.get(Document, document.id)
     assert updated is not None
-    assert updated.category == "finance"
+    assert updated.category == "documentation"
     assert updated.file_type == "pdf"
     assert updated.summary == "initial-summary"
 

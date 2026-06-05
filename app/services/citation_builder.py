@@ -19,7 +19,7 @@ _SOURCE_MARKER_RE = re.compile(r"\[(S\d+)\]")
 
 _DEFAULT_MAX_EXCERPT_CHARACTERS = 500
 
-_RelevanceSource = Literal["vector", "full_text", "hybrid", "manual", "context"]
+_RelevanceSource = Literal["vector", "full_text", "hybrid", "context"]
 
 
 def _relevance_source_from_matched_by(
@@ -143,7 +143,7 @@ class CitationBuilder:
             if truncated:
                 diag.excerpts_truncated += 1
 
-            metadata = {}
+            metadata: dict[str, object] = {}
             relevance_source: _RelevanceSource | None = "context"
             if retrieval_result is not None:
                 metadata = getattr(retrieval_result, "metadata", {}) or {}
@@ -240,7 +240,7 @@ class CitationBuilder:
                     excerpt=excerpt,
                     score=result.score,
                     relevance_source=relevance_source,
-                    metadata=getattr(result, "metadata", {}),
+                    metadata=getattr(result, "metadata", {}) or {},
                 )
             )
 

@@ -7,7 +7,7 @@ from collections.abc import AsyncGenerator, Generator
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -210,9 +210,7 @@ def test_citation_mapper_ignores_unknown_source_ids() -> None:
 @pytest.mark.asyncio
 async def test_chat_service_ignores_legacy_citation_mapper_instance(
     db_session: AsyncSession,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level("WARNING", logger="app.services.chat_service")
     chunk_id = uuid.uuid4()
     document_id = uuid.uuid4()
     hybrid_service = MagicMock()
@@ -254,31 +252,29 @@ async def test_chat_service_ignores_legacy_citation_mapper_instance(
         )
     )
 
-    service = ChatService(
-        db_session,
-        hybrid_search_service=hybrid_service,
-        search_service=MagicMock(),
-        context_builder=ContextBuilderService(),
-        model_provider=MockChatModelProvider(
-            answer="The notice period is three months. [S1]"
-        ),
-        citation_mapper=CitationMapper(),
-        settings=Settings(model_provider="mock", model_name="llama3.1", _env_file=None),  # type: ignore[call-arg]
-    )
+    with patch("app.services.chat_service.logger.warning") as warn_mock:
+        service = ChatService(
+            db_session,
+            hybrid_search_service=hybrid_service,
+            search_service=MagicMock(),
+            context_builder=ContextBuilderService(),
+            model_provider=MockChatModelProvider(
+                answer="The notice period is three months. [S1]"
+            ),
+            citation_mapper=CitationMapper(),
+            settings=Settings(model_provider="mock", model_name="llama3.1", _env_file=None),  # type: ignore[call-arg]
+        )
 
-    response = await service.ask_question(
-        ChatAskRequest(question="What is the notice period?")
-    )
+        response = await service.ask_question(
+            ChatAskRequest(question="What is the notice period?")
+        )
 
     assert len(response.citations) == 1
     assert response.citations[0].source_id == "S1"
     assert response.citations[0].document_id == document_id
-    assert "ignoring legacy citation_mapper" in caplog.text
-    assert any(
-        hasattr(record, "citation_mapper_type")
-        and record.citation_mapper_type == "CitationMapper"
-        for record in caplog.records
-    )
+    warn_mock.assert_called_once()
+    assert "ignoring legacy citation_mapper" in warn_mock.call_args.args[0]
+    assert warn_mock.call_args.kwargs["extra"]["citation_mapper_type"] == "CitationMapper"
 
 
 @pytest.mark.asyncio

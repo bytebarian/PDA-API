@@ -432,7 +432,7 @@ async def _run_category_assignment_stage(
             "error": message,
         }
     else:
-        stage_details: dict[str, Any] = {
+        stage_details = {
             "category_status": result.category_status,
             "skipped": result.skipped,
             "category": result.category,

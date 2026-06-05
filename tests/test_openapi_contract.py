@@ -33,6 +33,7 @@ def test_openapi_exposes_expected_gamma_routes(client: TestClient) -> None:
         "/documents/{document_id}/download",
         "/documents/{document_id}/reprocess",
         "/jobs/{job_id}",
+        "/reports/generate",
         "/health/live",
         "/health/ready",
     }

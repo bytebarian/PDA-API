@@ -537,7 +537,14 @@ def test_fusion_weighted_strategy() -> None:
     from app.services.vector_validation import similarity_from_cosine_distance
 
     v_score = similarity_from_cosine_distance(0.2)
-    expected = _weighted_score(v_score, 0.7, vector_weight=0.65, full_text_weight=0.35)
+    # Weighted fusion normalises full-text scores against the batch maximum.
+    ft_score_normalized = 0.7 / 0.7
+    expected = _weighted_score(
+        v_score,
+        ft_score_normalized,
+        vector_weight=0.65,
+        full_text_weight=0.35,
+    )
     assert math.isclose(entry.score, expected, rel_tol=1e-6)
 
 
