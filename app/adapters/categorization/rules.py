@@ -189,7 +189,9 @@ class RulesCategorizationProvider:
             haystack_parts.append(summary)
             haystack_parts.append(summary)
         if filename:
-            haystack_parts.append(filename)
+            # Treat separators as token boundaries so "invoice_2026.pdf" matches "invoice".
+            normalized_filename = re.sub(r"[_\-.]+", " ", filename)
+            haystack_parts.append(normalized_filename)
 
         haystack = _tokenize(" ".join(haystack_parts))
 
