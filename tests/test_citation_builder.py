@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-
+from typing import Literal
 
 from app.schemas.context import ContextSource, IncludedTextRange
 from app.schemas.hybrid_search import HybridSearchResult
@@ -46,7 +46,7 @@ def _make_hybrid_result(
     text: str = "Sample chunk text.",
     excerpt: str | None = None,
     score: float = 0.9,
-    matched_by: list[str] | None = None,
+    matched_by: list[Literal["vector", "full_text"]] | None = None,
 ) -> HybridSearchResult:
     return HybridSearchResult(
         chunk_id=chunk_id,

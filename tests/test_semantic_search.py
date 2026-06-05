@@ -17,6 +17,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.adapters.embeddings import (
     EmbeddingResult,
+    EmbeddingProvider,
     EmbeddingProviderUnavailableError,
     FakeEmbeddingProvider,
 )
@@ -1249,7 +1250,11 @@ def test_api_semantic_search_reuses_provider_and_closes_on_shutdown(
     )
 
     original_build = routers.search.build_embedding_providers
-    routers.search.build_embedding_providers = lambda _settings: {"fake": provider}
+
+    def build_fake_providers(settings: Settings) -> dict[str, EmbeddingProvider]:
+        return {"fake": provider}
+
+    routers.search.build_embedding_providers = build_fake_providers
 
     try:
         with TestClient(fastapi_app) as c:

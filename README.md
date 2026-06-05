@@ -76,6 +76,30 @@ PDA is designed as a privacy-first solution.
 - detect conflicts between agreements
 - generate reports based on contracts and official documents
 
+
+## Report generation API
+
+The backend exposes `POST /reports/generate` (or `POST /api/v1/reports/generate` when `PDA_API_PREFIX=/api/v1`) for local, grounded report drafting. The endpoint retrieves relevant indexed chunks, builds report-specific context, calls the configured local model provider, and returns markdown with source citations. Example request:
+
+```json
+{
+  "topic": "Summarize tax documents",
+  "instructions": "Highlight income figures and notable gaps.",
+  "filters": {"categories": ["finance"]},
+  "topK": 12
+}
+```
+
+Example response shape:
+
+```json
+{
+  "markdown": "# Tax Summary\n\n- Total income was $75,000. [S1]",
+  "citations": [],
+  "retrieval": {"strategy": "hybrid", "result_count": 1}
+}
+```
+
 ## Local development with Docker
 
 ### Prerequisites
@@ -162,7 +186,7 @@ PDA_OCR_PROVIDER=fake
 
 ## Project status
 
-The repository is in the Foundation phase. The backend development shell is in place with FastAPI app wiring, Docker-based local PostgreSQL + pgvector, Alembic migrations, and operational health endpoints. Higher-level business capabilities described above remain planned work for later phases.
+The repository is in the Foundation phase. The backend includes FastAPI app wiring, Docker-based local PostgreSQL + pgvector, Alembic migrations, operational health endpoints, document ingestion/processing, retrieval, grounded chat, citations, settings, and grounded report generation. Remaining higher-level business capabilities continue to be delivered incrementally.
 
 ## License
 
