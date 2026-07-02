@@ -23,3 +23,11 @@ def test_openapi_available(client: TestClient) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["info"]["title"] == app.title
+    assert payload["info"]["version"] == app.version
+
+
+def test_swagger_ui_available(client: TestClient) -> None:
+    response = client.get("/docs")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "Swagger UI" in response.text
