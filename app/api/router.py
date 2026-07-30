@@ -8,6 +8,7 @@ from app.api.routers.jobs import router as jobs_router
 from app.api.routers.reports import router as reports_router
 from app.api.routers.root import router as root_router
 from app.api.routers.search import router as search_router
+from app.api.routers.settings import router as settings_router
 
 api_router = APIRouter()
 api_router.include_router(root_router)
@@ -18,3 +19,4 @@ api_router.include_router(documents_router)
 api_router.include_router(jobs_router)
 api_router.include_router(reports_router)
 api_router.include_router(search_router)
+api_router.include_router(settings_router)
