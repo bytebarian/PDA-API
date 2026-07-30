@@ -20,6 +20,7 @@ from app.adapters.llm import (
     OllamaChatModelProvider,
 )
 from app.core.config import Settings, get_settings
+from app.schemas.app_settings import SUPPORTED_LLM_MODELS
 from app.schemas.chat import (
     ChatAskRequest,
     ChatAskResponse,
@@ -62,6 +63,10 @@ class ChatProviderNotAvailableError(ChatServiceError):
 
 class ChatConfigurationError(ChatServiceError):
     """Raised when chat configuration is missing or invalid."""
+
+
+class ChatModelNotSupportedError(ChatServiceError):
+    """Raised when a requested model is not in the supported allow-list."""
 
 
 @dataclass(frozen=True)
@@ -151,6 +156,44 @@ class ChatService:
             )
         return self._search_service_instance
 
+    async def _resolve_model_name(self, request_model: str | None) -> str:
+        """Resolve the model name following documented precedence.
+
+        Precedence (highest to lowest):
+        1. Valid explicit ``ChatAskRequest.model`` override.
+        2. Persisted ``app_settings.llm_model`` from the database.
+        3. ``PDA_MODEL_NAME`` / canonical code default — bootstrap fallback only.
+        """
+        if request_model is not None:
+            if request_model not in SUPPORTED_LLM_MODELS:
+                raise ChatModelNotSupportedError(
+                    f"Unsupported model '{request_model}'. "
+                    f"Supported values: {sorted(SUPPORTED_LLM_MODELS)}"
+                )
+            return request_model
+
+        # Try to read the persisted singleton settings row.
+        try:
+            from app.repositories.settings_repository import SettingsRepository
+
+            repo = SettingsRepository(self._db)
+            row = await repo.get()
+            if row is not None and row.llm_model:
+                logger.debug(
+                    "resolved model from persisted app_settings",
+                    extra={"model": row.llm_model},
+                )
+                return row.llm_model
+        except Exception:
+            logger.warning(
+                "failed to read app_settings for model resolution; "
+                "falling back to environment default",
+                exc_info=True,
+            )
+
+        # Final fallback: environment / code default.
+        return self._settings.model_name
+
     async def ask_question(self, request: ChatAskRequest) -> ChatAskResponse:
         """Answer one question using retrieved document context."""
         started = time.perf_counter()
@@ -175,7 +218,7 @@ class ChatService:
                 ),
             )
 
-        model_name = request.model or self._settings.model_name
+        model_name = await self._resolve_model_name(request.model)
         messages = self._build_messages(request.question, built_context.context_text)
 
         try:

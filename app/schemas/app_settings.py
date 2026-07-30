@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 DEFAULT_STORAGE_PATH = "./storage"
 DEFAULT_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
@@ -27,8 +27,17 @@ DEFAULT_OCR_DPI = 300
 DEFAULT_CHUNK_SIZE = 1000
 DEFAULT_CHUNK_OVERLAP = 200
 DEFAULT_EMBEDDING_DIMENSIONS = 384
-DEFAULT_LLM_PROVIDER = "openai"
-DEFAULT_LLM_MODEL = "gpt-4o-mini"
+DEFAULT_LLM_PROVIDER = "local"
+DEFAULT_LLM_MODEL = "llama3.1:8b-instruct-q8_0"
+
+SUPPORTED_LLM_MODELS: frozenset[str] = frozenset(
+    {
+        "llama3.1:8b-instruct-q8_0",
+        "llama3.1:8b",
+        "llama3.2:3b",
+        "gemma3:1b",
+    }
+)
 
 
 def _default_allowed_file_types_jsonb() -> list[str]:
@@ -83,6 +92,18 @@ class AppSettingsUpdate(BaseModel):
     privacy_local_only: bool | None = None
     telemetry_enabled: bool | None = None
     extra_settings_jsonb: dict[str, Any] | None = None
+
+    @field_validator("llm_model")
+    @classmethod
+    def llm_model_must_be_supported(cls, value: str | None) -> str | None:
+        """Reject model identifiers not in the supported allow-list."""
+        if value is not None and value not in SUPPORTED_LLM_MODELS:
+            sorted_models = sorted(SUPPORTED_LLM_MODELS)
+            raise ValueError(
+                f"Unsupported llm_model '{value}'. "
+                f"Supported values: {sorted_models}"
+            )
+        return value
 
 
 class AppSettingsRead(AppSettingsBase):

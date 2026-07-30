@@ -7,12 +7,13 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.routers.search import _get_shared_providers
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.schemas.chat import ChatAskRequest, ChatAskResponse
-from app.api.routers.search import _get_shared_providers
 from app.services.chat_service import (
     ChatConfigurationError,
+    ChatModelNotSupportedError,
     ChatProviderNotAvailableError,
     ChatService,
     ChatServiceError,
@@ -34,7 +35,7 @@ def get_chat_service(
 
 
 @router.post(
-    "",
+    "/ask",
     response_model=ChatAskResponse,
     summary="Ask a question grounded in indexed document chunks",
     description=(
@@ -49,6 +50,12 @@ async def ask_question(
     """Answer a one-shot question using retrieved document context."""
     try:
         return await service.ask_question(request)
+    except ChatModelNotSupportedError as exc:
+        logger.warning("Unsupported chat model requested: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     except ChatProviderNotAvailableError as exc:
         logger.warning("Chat provider unavailable: %s", exc)
         raise HTTPException(
