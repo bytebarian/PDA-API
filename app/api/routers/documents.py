@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, HTTPException, Query, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,6 +41,7 @@ from app.schemas.document import (
 from app.schemas.upload import UploadResponse
 from app.services.ingestion import ingest_upload
 from app.services.file_storage import resolve_stored_file_path, sanitize_filename
+from app.workers.processing import enqueue_processing_job
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -99,6 +100,7 @@ async def read_upload_limited(file: UploadFile, max_bytes: int) -> bytes:
     summary="Upload a document file",
 )
 async def upload_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(..., description="The document file to upload."),
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
@@ -110,6 +112,7 @@ async def upload_document(
     - Validates the MIME type against the configured allow-list.
     - Persists the file to local storage.
     - Creates a **Document** row and a linked **ProcessingJob** row.
+    - Enqueues background processing so the document leaves ``awaiting``.
     - Returns document and job identifiers plus initial status values.
     """
     data = await read_upload_limited(file, settings.max_file_size_bytes)
@@ -122,6 +125,8 @@ async def upload_document(
         data=data,
         settings=settings,
     )
+
+    enqueue_processing_job(background_tasks, job.id)
 
     return UploadResponse(
         document_id=document.id,
@@ -318,6 +323,7 @@ async def update_document(
 )
 async def reprocess_document(
     document_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     payload: ReprocessRequest | None = Body(None),
     db: AsyncSession = Depends(get_db),
 ) -> ReprocessResponse:
@@ -326,7 +332,8 @@ async def reprocess_document(
     If no payload is provided, the endpoint records a plain reprocess request.
     If payload is provided, it records force/reason in job stage history.
     Storage-related fields (path, checksum, size, filename, metadata) are
-    preserved, while document status is reset to awaiting.
+    preserved, while document status is reset to awaiting. A background task
+    then runs the processing pipeline for the new job.
     """
     document = await db.get(Document, document_id)
     if document is None:
@@ -356,6 +363,8 @@ async def reprocess_document(
     await db.commit()
     await db.refresh(job)
     await db.refresh(document)
+
+    enqueue_processing_job(background_tasks, job.id)
 
     return ReprocessResponse(
         document_id=document.id,

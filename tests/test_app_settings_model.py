@@ -120,7 +120,7 @@ async def test_app_settings_insert_and_read_defaults(db_session: AsyncSession) -
     assert settings.embedding_model is None
     assert settings.embedding_dimensions == 1536
     assert settings.llm_provider == "local"
-    assert settings.llm_model == "llama3.1:8b-instruct"
+    assert settings.llm_model == "llama3.1:8b-instruct-q8_0"
     assert settings.privacy_local_only is True
     assert settings.telemetry_enabled is False
     assert settings.extra_settings_jsonb == {}

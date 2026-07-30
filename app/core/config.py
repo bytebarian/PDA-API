@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     api_prefix: str = "/"
 
+    cors_allowed_origins: Annotated[tuple[str, ...], NoDecode] = (
+        "http://localhost:5173",
+    )
+
     database_url: str = "sqlite+aiosqlite:///./pda.db"
     storage_path: Path = Path("./storage")
 
@@ -24,7 +28,7 @@ class Settings(BaseSettings):
     max_file_size_bytes: int = 10 * 1024 * 1024
 
     model_provider: str = "local"
-    model_name: str = "llama3.1:8b-instruct"
+    model_name: str = "llama3.1:8b-instruct-q8_0"
 
     ocr_provider: str = "tesseract"
     ocr_language: str = "eng"
@@ -92,6 +96,21 @@ class Settings(BaseSettings):
 
         if not parsed:
             raise ValueError("allowed_file_types must include at least one MIME type")
+
+        return parsed
+
+    @field_validator("cors_allowed_origins", mode="before")
+    @classmethod
+    def normalize_cors_allowed_origins(cls, value: object) -> tuple[str, ...]:
+        if value is None:
+            return ()
+
+        if isinstance(value, str):
+            parsed = tuple(item.strip() for item in value.split(",") if item.strip())
+        elif isinstance(value, (list, tuple, set)):
+            parsed = tuple(str(item).strip() for item in value if str(item).strip())
+        else:
+            raise ValueError("cors_allowed_origins must be a list or comma-separated string")
 
         return parsed
 

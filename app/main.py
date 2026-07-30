@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.api.routers.search import close_search_providers
@@ -25,6 +26,14 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
         lifespan=_app_lifespan,
     )
+    if settings.cors_allowed_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(settings.cors_allowed_origins),
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
     app.include_router(api_router, prefix=settings.api_prefix)
     return app
 

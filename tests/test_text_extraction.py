@@ -9,10 +9,12 @@ import pytest
 from app.services.text_extraction import (
     ExtractedTextResult,
     MarkdownAdapter,
+    PdfAdapter,
     PlainTextAdapter,
     TextExtractionAdapter,
     TextExtractionDecodeError,
     TextExtractionFileNotFoundError,
+    TextExtractionParseError,
     UnsupportedTextExtractionTypeError,
     _resolve_adapter,
     extract_text_from_file,
@@ -30,6 +32,10 @@ def test_plain_text_adapter_satisfies_protocol() -> None:
 
 def test_markdown_adapter_satisfies_protocol() -> None:
     assert isinstance(MarkdownAdapter(), TextExtractionAdapter)
+
+
+def test_pdf_adapter_satisfies_protocol() -> None:
+    assert isinstance(PdfAdapter(), TextExtractionAdapter)
 
 
 # ---------------------------------------------------------------------------
@@ -138,6 +144,116 @@ async def test_markdown_extract_decode_error_raises(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# PDF extraction
+# ---------------------------------------------------------------------------
+
+
+def _write_simple_pdf(path: Path, lines: list[str]) -> None:
+    """Write a minimal single-page PDF containing *lines* of text."""
+    # Escape parentheses/backslashes for PDF string literals.
+    escaped = []
+    for line in lines:
+        escaped.append(
+            line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+        )
+
+    content_ops = ["BT", "/F1 12 Tf", "50 750 Td"]
+    for index, line in enumerate(escaped):
+        if index == 0:
+            content_ops.append(f"({line}) Tj")
+        else:
+            content_ops.append(f"0 -16 Td ({line}) Tj")
+    content_ops.append("ET")
+    stream = "\n".join(content_ops)
+    stream_bytes = stream.encode("latin-1")
+
+    objects = [
+        "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+        "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+        (
+            "3 0 obj\n"
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            "/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\n"
+            "endobj\n"
+        ),
+        (
+            f"4 0 obj\n<< /Length {len(stream_bytes)} >>\nstream\n"
+            f"{stream}\nendstream\nendobj\n"
+        ),
+        "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+    ]
+
+    pdf = bytearray(b"%PDF-1.4\n")
+    offsets = [0]
+    for obj in objects:
+        offsets.append(len(pdf))
+        pdf.extend(obj.encode("latin-1"))
+
+    xref_pos = len(pdf)
+    pdf.extend(f"xref\n0 {len(offsets)}\n".encode("latin-1"))
+    pdf.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        pdf.extend(f"{offset:010d} 00000 n \n".encode("latin-1"))
+    pdf.extend(
+        (
+            f"trailer\n<< /Size {len(offsets)} /Root 1 0 R >>\n"
+            f"startxref\n{xref_pos}\n%%EOF\n"
+        ).encode("latin-1")
+    )
+    path.write_bytes(bytes(pdf))
+
+
+async def test_pdf_extract_returns_result(tmp_path: Path) -> None:
+    f = tmp_path / "invoice.pdf"
+    _write_simple_pdf(f, ["Hello PDF", "Second line"])
+
+    result = await PdfAdapter().extract(f)
+
+    assert isinstance(result, ExtractedTextResult)
+    assert "Hello PDF" in result.text
+    assert result.page_count == 1
+
+
+async def test_pdf_extract_metadata_keys(tmp_path: Path) -> None:
+    f = tmp_path / "notes.pdf"
+    _write_simple_pdf(f, ["Notes page"])
+    raw = f.read_bytes()
+
+    result = await PdfAdapter().extract(f)
+
+    assert result.metadata["extractor"] == "PdfAdapter"
+    assert result.metadata["source_extension"] == ".pdf"
+    assert result.metadata["mime_type"] == "application/pdf"
+    assert result.metadata["byte_size"] == len(raw)
+    assert result.metadata["page_count"] == 1
+    assert result.metadata["char_count"] == len(result.text)
+
+
+async def test_pdf_extract_missing_file_raises(tmp_path: Path) -> None:
+    missing = tmp_path / "missing.pdf"
+    with pytest.raises(TextExtractionFileNotFoundError, match="missing.pdf"):
+        await PdfAdapter().extract(missing)
+
+
+async def test_pdf_extract_invalid_pdf_raises(tmp_path: Path) -> None:
+    f = tmp_path / "corrupt.pdf"
+    f.write_bytes(b"not a real pdf")
+
+    with pytest.raises(TextExtractionParseError):
+        await PdfAdapter().extract(f)
+
+
+async def test_extract_text_from_file_pdf(tmp_path: Path) -> None:
+    f = tmp_path / "contract.pdf"
+    _write_simple_pdf(f, ["Contract clause one"])
+
+    result = await extract_text_from_file(f, mime_type="application/pdf")
+
+    assert "Contract clause one" in result.text
+    assert result.metadata["extractor"] == "PdfAdapter"
+
+
+# ---------------------------------------------------------------------------
 # Resolver behaviour
 # ---------------------------------------------------------------------------
 
@@ -172,6 +288,16 @@ def test_resolver_picks_markdown_by_markdown_extension() -> None:
     assert isinstance(adapter, MarkdownAdapter)
 
 
+def test_resolver_picks_pdf_by_mime() -> None:
+    adapter = _resolve_adapter(mime_type="application/pdf")
+    assert isinstance(adapter, PdfAdapter)
+
+
+def test_resolver_picks_pdf_by_extension() -> None:
+    adapter = _resolve_adapter(filename="document.pdf")
+    assert isinstance(adapter, PdfAdapter)
+
+
 def test_resolver_mime_takes_precedence_over_extension() -> None:
     # Passing a text/plain MIME with a .md filename should resolve to plain text.
     adapter = _resolve_adapter(mime_type="text/plain", filename="doc.md")
@@ -184,13 +310,13 @@ def test_resolver_strips_mime_charset_parameter() -> None:
 
 
 def test_resolver_unsupported_mime_raises() -> None:
-    with pytest.raises(UnsupportedTextExtractionTypeError, match="application/pdf"):
-        _resolve_adapter(mime_type="application/pdf")
+    with pytest.raises(UnsupportedTextExtractionTypeError, match="application/zip"):
+        _resolve_adapter(mime_type="application/zip")
 
 
 def test_resolver_unsupported_extension_raises() -> None:
-    with pytest.raises(UnsupportedTextExtractionTypeError, match="document.pdf"):
-        _resolve_adapter(filename="document.pdf")
+    with pytest.raises(UnsupportedTextExtractionTypeError, match="archive.zip"):
+        _resolve_adapter(filename="archive.zip")
 
 
 def test_resolver_no_hints_raises() -> None:

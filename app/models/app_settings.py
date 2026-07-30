@@ -29,7 +29,7 @@ DEFAULT_CHUNK_SIZE = 1000
 DEFAULT_CHUNK_OVERLAP = 200
 DEFAULT_EMBEDDING_DIMENSIONS = 1536
 DEFAULT_LLM_PROVIDER = "local"
-DEFAULT_LLM_MODEL = "llama3.1:8b-instruct"
+DEFAULT_LLM_MODEL = "llama3.1:8b-instruct-q8_0"
 
 
 def _default_allowed_file_types() -> list[str]:

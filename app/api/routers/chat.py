@@ -34,7 +34,7 @@ def get_chat_service(
 
 
 @router.post(
-    "/ask",
+    "",
     response_model=ChatAskResponse,
     summary="Ask a question grounded in indexed document chunks",
     description=(

@@ -13,6 +13,19 @@ from app.db.base import Base
 import app.models  # noqa: F401 – ensure all models are registered
 
 
+@pytest.fixture(autouse=True)
+def _disable_background_processing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep API contract tests deterministic: do not run the pipeline in-request.
+
+    Upload/reprocess still schedule work in production; tests that need the
+    orchestrator call ``process_job`` directly.
+    """
+    monkeypatch.setattr(
+        "app.api.routers.documents.enqueue_processing_job",
+        lambda background_tasks, job_id: None,
+    )
+
+
 @pytest.fixture
 async def db_session(
     monkeypatch: pytest.MonkeyPatch,

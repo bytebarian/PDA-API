@@ -1,8 +1,8 @@
 """Text extraction adapter interface and built-in adapters.
 
 Provides a protocol-based contract for text extraction, a result DTO,
-domain exceptions, and deterministic adapters for plain-text and
-Markdown files.  A registry/resolver maps MIME types and file extensions
+domain exceptions, and deterministic adapters for plain-text, Markdown,
+and PDF files.  A registry/resolver maps MIME types and file extensions
 to the correct adapter and exposes a high-level ``extract_text_from_file``
 helper for callers.
 """
@@ -35,6 +35,10 @@ class TextExtractionFileNotFoundError(TextExtractionError):
 
 class TextExtractionDecodeError(TextExtractionError):
     """Raised when a file cannot be decoded with the expected encoding."""
+
+
+class TextExtractionParseError(TextExtractionError):
+    """Raised when a structured document (for example PDF) cannot be parsed."""
 
 
 # ---------------------------------------------------------------------------
@@ -167,6 +171,74 @@ class MarkdownAdapter:
         )
 
 
+class PdfAdapter:
+    """Extracts text from PDF files using pypdf (local, no cloud)."""
+
+    supported_mime_types: Collection[str] = frozenset({"application/pdf"})
+    supported_extensions: Collection[str] = frozenset({".pdf"})
+
+    async def extract(
+        self,
+        file_path: Path,
+        *,
+        document: Document | None = None,
+    ) -> ExtractedTextResult:
+        if not file_path.exists():
+            raise TextExtractionFileNotFoundError(
+                f"File not found: {file_path}"
+            )
+
+        try:
+            from pypdf import PdfReader
+            from pypdf.errors import PdfReadError
+        except ImportError as exc:  # pragma: no cover - dependency is required
+            raise TextExtractionError(
+                "PDF extraction requires the 'pypdf' package to be installed"
+            ) from exc
+
+        raw = file_path.read_bytes()
+        try:
+            reader = PdfReader(file_path)
+        except PdfReadError as exc:
+            raise TextExtractionParseError(
+                f"Cannot parse PDF {file_path}: {exc}"
+            ) from exc
+        except Exception as exc:
+            raise TextExtractionParseError(
+                f"Cannot parse PDF {file_path}: {exc}"
+            ) from exc
+
+        page_texts: list[str] = []
+        for page in reader.pages:
+            try:
+                page_text = page.extract_text() or ""
+            except Exception as exc:
+                raise TextExtractionParseError(
+                    f"Failed extracting text from PDF page in {file_path}: {exc}"
+                ) from exc
+            # Normalise line endings per page.
+            page_texts.append(page_text.replace("\r\n", "\n").replace("\r", "\n"))
+
+        text = "\n".join(page_texts).strip()
+
+        page_count = len(reader.pages)
+        ext = file_path.suffix.lower() or ".pdf"
+        mime = _mime_for_extension(ext) or "application/pdf"
+
+        return ExtractedTextResult(
+            text=text,
+            metadata={
+                "extractor": "PdfAdapter",
+                "source_extension": ext,
+                "mime_type": mime,
+                "byte_size": len(raw),
+                "char_count": len(text),
+                "page_count": page_count,
+            },
+            page_count=page_count,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -175,6 +247,7 @@ _EXTENSION_TO_MIME: dict[str, str] = {
     ".txt": "text/plain",
     ".md": "text/markdown",
     ".markdown": "text/markdown",
+    ".pdf": "application/pdf",
 }
 
 
@@ -190,6 +263,7 @@ def _mime_for_extension(ext: str) -> str | None:
 _REGISTRY: list[TextExtractionAdapter] = [
     PlainTextAdapter(),
     MarkdownAdapter(),
+    PdfAdapter(),
 ]
 
 
