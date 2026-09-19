@@ -1,3 +1,4 @@
+import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
@@ -13,6 +14,9 @@ class Settings(BaseSettings):
 
     cors_allowed_origins: Annotated[tuple[str, ...], NoDecode] = (
         "http://localhost:5173",
+    )
+    cors_allowed_origin_regex: str | None = (
+        r"https?://(?:localhost|127\.0\.0\.1)(?::\d+)?"
     )
 
     database_url: str = "sqlite+aiosqlite:///./pda.db"
@@ -106,10 +110,20 @@ class Settings(BaseSettings):
             return ()
 
         if isinstance(value, str):
-            parsed = tuple(item.strip() for item in value.split(",") if item.strip())
-        elif isinstance(value, (list, tuple, set)):
+            stripped = value.strip()
+            if stripped.startswith("["):
+                try:
+                    value = json.loads(stripped)
+                except json.JSONDecodeError as exc:
+                    raise ValueError(
+                        "cors_allowed_origins must be valid JSON or a comma-separated string"
+                    ) from exc
+            else:
+                parsed = tuple(item.strip() for item in value.split(",") if item.strip())
+
+        if isinstance(value, (list, tuple, set)):
             parsed = tuple(str(item).strip() for item in value if str(item).strip())
-        else:
+        elif not isinstance(value, str):
             raise ValueError("cors_allowed_origins must be a list or comma-separated string")
 
         return parsed

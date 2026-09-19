@@ -7,6 +7,7 @@ from app.core.config import Settings
 def test_settings_defaults() -> None:
     settings = Settings()
     assert settings.database_url
+    assert settings.cors_allowed_origin_regex
     assert settings.storage_path.as_posix().endswith("storage")
     assert "application/pdf" in settings.allowed_file_types
     assert settings.max_file_size_bytes > 0
@@ -44,6 +45,22 @@ def test_settings_reads_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.embedding_provider == "fake"
     assert settings.tesseract_languages == ("eng", "deu")
     assert settings.tesseract_timeout_seconds == 45
+
+
+def test_settings_parses_cors_origins_from_json(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "PDA_CORS_ALLOWED_ORIGINS",
+        '["https://app.example.com", "http://localhost:3000"]',
+    )
+
+    settings = Settings()
+
+    assert settings.cors_allowed_origins == (
+        "https://app.example.com",
+        "http://localhost:3000",
+    )
 
 
 def test_invalid_settings_fail_clearly() -> None:

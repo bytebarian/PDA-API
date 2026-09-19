@@ -43,3 +43,39 @@ def test_cors_allows_local_frontend_origin(client: TestClient) -> None:
     )
     assert response.status_code == 200
     assert response.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "https://localhost:4173",
+    ],
+)
+def test_cors_allows_loopback_frontend_origins(
+    client: TestClient, origin: str
+) -> None:
+    response = client.options(
+        "/health/live",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-origin") == origin
+
+
+def test_cors_rejects_non_loopback_origin(client: TestClient) -> None:
+    response = client.options(
+        "/health/live",
+        headers={
+            "Origin": "http://localhost.example.com:5173",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers

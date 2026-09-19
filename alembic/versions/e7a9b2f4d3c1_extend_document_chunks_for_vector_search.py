@@ -9,7 +9,6 @@ Create Date: 2026-06-01 19:50:00.000000
 from typing import Sequence, Union
 
 import sqlalchemy as sa
-from sqlalchemy.exc import SQLAlchemyError
 
 from alembic import op
 
@@ -68,25 +67,10 @@ def upgrade() -> None:
 
     if is_postgres:
         op.execute("ALTER TABLE document_chunks ALTER COLUMN embedding TYPE vector")
-        try:
-            op.execute(
-                "CREATE INDEX IF NOT EXISTS ix_document_chunks_embedding_hnsw "
-                "ON document_chunks USING hnsw (embedding vector_cosine_ops)"
-            )
-        except SQLAlchemyError as hnsw_error:
-            try:
-                op.execute(
-                    "CREATE INDEX IF NOT EXISTS ix_document_chunks_embedding_ivfflat "
-                    "ON document_chunks USING ivfflat (embedding vector_cosine_ops)"
-                )
-            except SQLAlchemyError as ivfflat_error:
-                raise RuntimeError(
-                    "Failed to create pgvector similarity index via both HNSW and IVFFlat"
-                ) from ivfflat_error
-            op.get_context().log.info(
-                "Fell back to IVFFlat index after HNSW index creation failed: %s",
-                hnsw_error,
-            )
+        # A dimensionless vector column can store embeddings produced by models
+        # with different dimensions, but pgvector cannot build one ANN index
+        # across those rows. Such indexes must be expression/partial indexes
+        # scoped to a specific model and dimension.
 
 
 def downgrade() -> None:

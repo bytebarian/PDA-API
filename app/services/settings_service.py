@@ -13,11 +13,14 @@ class SettingsService:
     """Business logic for reading and updating application settings."""
 
     def __init__(self, db: AsyncSession) -> None:
+        self._db = db
         self._repo = SettingsRepository(db)
 
     async def get_settings(self) -> AppSettings:
         """Return the singleton settings row, creating it from defaults when absent."""
-        return await self._repo.get_or_create()
+        row = await self._repo.get_or_create()
+        await self._commit()
+        return row
 
     async def update_settings(self, update: AppSettingsUpdate) -> AppSettings:
         """Apply a partial update and return the updated settings row.
@@ -34,5 +37,16 @@ class SettingsService:
             if value is not None
         }
         if not changes:
+            await self._commit()
             return row
-        return await self._repo.update(row, changes)
+        row = await self._repo.update(row, changes)
+        await self._commit()
+        return row
+
+    async def _commit(self) -> None:
+        """Commit the settings transaction and leave the session reusable on failure."""
+        try:
+            await self._db.commit()
+        except Exception:
+            await self._db.rollback()
+            raise

@@ -15,7 +15,6 @@ from app.core.config import Settings, get_settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app as fastapi_app
-from app.models.app_settings import AppSettings
 from app.repositories.settings_repository import SettingsRepository
 from app.schemas.app_settings import (
     DEFAULT_LLM_MODEL,
@@ -161,6 +160,26 @@ async def test_settings_service_update_preserves_unset_fields(
     row = await service.update_settings(AppSettingsUpdate(telemetry_enabled=True))
     assert row.llm_model == "llama3.2:3b"
     assert row.telemetry_enabled is True
+
+
+@pytest.mark.asyncio
+async def test_settings_service_update_persists_in_new_session(tmp_path: Path) -> None:
+    """A successful update must survive the request session being closed."""
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'settings.db'}")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    factory = async_sessionmaker(bind=engine, expire_on_commit=False)
+    async with factory() as write_session:
+        service = SettingsService(write_session)
+        await service.update_settings(AppSettingsUpdate(llm_model="gemma3:1b"))
+
+    async with factory() as read_session:
+        persisted = await SettingsRepository(read_session).get()
+
+    assert persisted is not None
+    assert persisted.llm_model == "gemma3:1b"
+    await engine.dispose()
 
 
 # ---------------------------------------------------------------------------

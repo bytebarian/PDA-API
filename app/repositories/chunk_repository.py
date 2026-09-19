@@ -418,7 +418,7 @@ class ChunkRepository:
             FROM document_chunks c
             JOIN documents d ON d.id = c.document_id
             WHERE
-                c.document_id = ANY(:doc_ids::uuid[])
+                c.document_id = ANY(CAST(:doc_ids AS uuid[]))
                 AND to_tsvector('simple', c.content)
                     @@ websearch_to_tsquery('simple', :query)
             ORDER BY ft_score DESC, c.chunk_index ASC

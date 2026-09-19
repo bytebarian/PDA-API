@@ -37,7 +37,7 @@ class TesseractOCRProvider:
         oem: int | None = 3,
     ) -> None:
         self.command = command
-        self.default_languages = list(default_languages or ["eng"])
+        self.default_languages = list(default_languages or ["pl"])
         self.default_timeout_seconds = default_timeout_seconds
         self.psm = psm
         self.oem = oem
@@ -59,7 +59,7 @@ class TesseractOCRProvider:
         if not file_path.exists():
             raise OCRUnreadableImageError(f"Image file not found: {file_path}")
 
-        selected_languages = list(languages or self.default_languages or ["eng"])
+        selected_languages = list(languages or self.default_languages or ["pl"])
         resolved_timeout = timeout_seconds or self.default_timeout_seconds
 
         text_process, tsv_process, engine_version = await asyncio.gather(
@@ -166,6 +166,8 @@ class TesseractOCRProvider:
                 command,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 check=False,
                 timeout=timeout_seconds,
             )
