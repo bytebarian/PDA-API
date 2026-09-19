@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,13 +12,13 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.ocr import (
+    FakeOCRProvider,
     OCREmptyResultError,
     OCRPageResult,
     OCRProvider,
     OCRProviderUnavailableError,
     OCRResult,
     OCRUnsupportedMimeTypeError,
-    FakeOCRProvider,
     TesseractOCRProvider,
     mime_type_requires_ocr,
     normalize_mime_type,
@@ -27,6 +28,7 @@ from app.domain.status import ProcessingJobStage
 from app.models.document import Document
 from app.models.processing_job import ProcessingJob
 from app.services.file_storage import resolve_stored_file_path
+from app.services.pdf_renderer import PDFiumRenderer, PDFRenderer
 
 
 @dataclass(frozen=True)
@@ -51,7 +53,9 @@ def _append_stage_history(
     message: str | None = None,
     details: dict[str, Any] | None = None,
 ) -> None:
-    from app.services.processing_orchestrator import _append_stage_history as append_job_stage_history
+    from app.services.processing_orchestrator import (
+        _append_stage_history as append_job_stage_history,
+    )
 
     append_job_stage_history(
         job,
@@ -105,12 +109,136 @@ def get_ocr_provider(
     raise OCRProviderUnavailableError(f"Unsupported OCR provider: {selected_provider}")
 
 
+def get_pdf_renderer() -> PDFRenderer:
+    """Return the local PDF page renderer used by the OCR fallback."""
+
+    return PDFiumRenderer()
+
+
 class OCRService:
     """Loads image documents, runs OCR, and persists extracted text/metadata."""
 
     def __init__(self, db: AsyncSession, *, settings: Settings | None = None) -> None:
         self.db = db
         self.settings = settings or get_settings()
+
+    async def extract_text_from_pdf_document(
+        self,
+        document_id: uuid.UUID,
+        *,
+        provider_name: str | None = None,
+        languages: list[str] | None = None,
+    ) -> OCRExtractionResult:
+        """Render an image-only PDF and OCR its pages in source order."""
+
+        document = await self.db.get(Document, document_id)
+        if document is None:
+            raise LookupError(f"Document not found: {document_id}")
+
+        normalized_mime = normalize_mime_type(document.mime_type)
+        if normalized_mime != "application/pdf":
+            raise OCRUnsupportedMimeTypeError(
+                f"Unsupported PDF OCR MIME type: {normalized_mime or '<unknown>'}"
+            )
+
+        resolved_path = resolve_stored_file_path(
+            self.settings.storage_path,
+            document.path or "",
+        )
+        if resolved_path is None:
+            raise FileNotFoundError(
+                f"Document file path is missing or outside storage root for document {document.id}"
+            )
+
+        provider = get_ocr_provider(provider_name=provider_name, settings=self.settings)
+        selected_languages = list(languages or _default_languages(self.settings))
+        renderer = get_pdf_renderer()
+        started = perf_counter()
+        pages: list[OCRPageResult] = []
+        warnings: list[str] = []
+        engine_version: str | None = None
+
+        with tempfile.TemporaryDirectory(prefix="pda-pdf-ocr-") as temp_directory:
+            rendered_pages = await renderer.render_pages(
+                resolved_path,
+                Path(temp_directory),
+                dpi=self.settings.ocr_dpi,
+            )
+            for page_number, page_path in enumerate(rendered_pages, start=1):
+                page_result = await provider.extract_text(
+                    page_path,
+                    mime_type="image/png",
+                    languages=selected_languages,
+                    timeout_seconds=self.settings.tesseract_timeout_seconds,
+                )
+                engine_version = page_result.engine_version or engine_version
+                for warning in page_result.warnings:
+                    if warning not in warnings:
+                        warnings.append(warning)
+                page_text = _combine_pages(page_result)
+                pages.append(
+                    OCRPageResult(
+                        page_number=page_number,
+                        text=page_text,
+                        confidence=_average_confidence(page_result.pages),
+                        metadata={"source_page": page_number},
+                    )
+                )
+
+        combined_result = OCRResult(
+            provider=provider.name,
+            engine_version=engine_version,
+            languages=selected_languages,
+            pages=pages,
+            warnings=warnings,
+            metadata={"source_mime_type": normalized_mime},
+        )
+        extracted_text = _combine_pages(combined_result)
+        if not extracted_text:
+            raise OCREmptyResultError(
+                f"OCR produced empty text for PDF document {document.id}"
+            )
+
+        confidence = _average_confidence(pages)
+        duration_seconds = round(perf_counter() - started, 6)
+        metadata = {
+            "provider": provider.name,
+            "engine_version": engine_version,
+            "languages": selected_languages,
+            "char_count": len(extracted_text),
+            "confidence": confidence,
+            "duration_seconds": duration_seconds,
+            "warnings": warnings,
+            "page_count": len(pages),
+            "mime_type": normalized_mime,
+            "source_path": str(resolved_path),
+            "extraction_method": "pdf_ocr",
+            "pages": [
+                {
+                    "page_number": page.page_number,
+                    "char_count": len(page.text.strip()),
+                    "confidence": page.confidence,
+                }
+                for page in pages
+            ],
+        }
+        merged_metadata = dict(document.metadata_jsonb or {})
+        merged_metadata["ocr"] = metadata
+        document.extracted_text = extracted_text
+        document.metadata_jsonb = merged_metadata
+        await self.db.flush()
+
+        return OCRExtractionResult(
+            document_id=document.id,
+            provider=provider.name,
+            extracted_text=extracted_text,
+            char_count=len(extracted_text),
+            confidence=confidence,
+            languages=selected_languages,
+            warnings=warnings,
+            duration_seconds=duration_seconds,
+            metadata=metadata,
+        )
 
     async def extract_text_for_document(
         self,
