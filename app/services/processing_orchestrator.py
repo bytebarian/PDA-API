@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +26,7 @@ class ProcessingOrchestratorStateError(RuntimeError):
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _append_stage_history(
@@ -167,8 +167,8 @@ async def _run_text_extraction_stage(
     db: AsyncSession, document: Document, job: ProcessingJob
 ) -> None:
     from app.core.config import get_settings
-    from app.services.ocr_service import document_requires_ocr
     from app.services.file_storage import resolve_stored_file_path
+    from app.services.ocr_service import OCRService, document_requires_ocr
     from app.services.text_extraction import extract_text_from_file
 
     _append_stage_history(job, stage=ProcessingJobStage.text_extraction, status="processing")
@@ -177,6 +177,7 @@ async def _run_text_extraction_stage(
         not document_requires_ocr(document)
         and (document.extracted_text is None or not document.extracted_text.strip())
     )
+    extraction_method = "existing"
     if needs_extraction:
         stored_path = document.path or ""
         resolved_path = resolve_stored_file_path(get_settings().storage_path, stored_path)
@@ -191,12 +192,23 @@ async def _run_text_extraction_stage(
             document=document,
         )
         document.extracted_text = result.text
+        extraction_method = "native"
+
+        normalized_mime = (document.mime_type or "").split(";", 1)[0].strip().lower()
+        is_pdf = normalized_mime == "application/pdf" or document.filename.lower().endswith(".pdf")
+        if is_pdf and not result.text.strip():
+            ocr_result = await OCRService(db).extract_text_from_pdf_document(document.id)
+            document.extracted_text = ocr_result.extracted_text
+            extraction_method = "pdf_ocr"
 
     _append_stage_history(
         job,
         stage=ProcessingJobStage.text_extraction,
         status="completed",
-        details={"char_count": len((document.extracted_text or "").strip())},
+        details={
+            "char_count": len((document.extracted_text or "").strip()),
+            "extraction_method": extraction_method,
+        },
     )
 
 
